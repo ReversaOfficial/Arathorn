@@ -804,10 +804,14 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
       </div>
       <div class="form-group">
         <label class="form-label">Senha</label>
-        <input class="form-input" id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+        <input class="form-input" id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <div class="form-error" id="l-error"></div>
       <button class="btn-auth" id="btn-login" onclick="doLogin()">⚔ Entrar no Reino</button>
+      <div style="text-align:center;margin-top:12px">
+        <span style="color:var(--text-muted);font-size:13px">Esqueceu a senha? </span>
+        <button onclick="authTab('recover')" style="background:none;border:none;color:var(--gold);font-size:13px;cursor:pointer;text-decoration:underline;padding:0">Recuperar acesso</button>
+      </div>
     </div>
 
     <!-- REGISTER -->
@@ -824,11 +828,56 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
         <label class="form-label">Confirmar Senha</label>
         <input class="form-input" id="r-pass2" type="password" placeholder="Repita a senha" autocomplete="new-password">
       </div>
+      <div class="form-group">
+        <label class="form-label">E-mail <span style="color:var(--text-muted);font-size:11px">(para recuperação de senha)</span></label>
+        <input class="form-input" id="r-email" type="email" placeholder="seu@email.com" autocomplete="email">
+      </div>
       <div class="form-error" id="r-error"></div>
       <button class="btn-auth" id="btn-register" onclick="doRegister()">⚔ Criar Conta</button>
     </div>
 
-    <div class="auth-footer">Servidor local • Dados salvos no servidor</div>
+    <!-- RECOVER — step 1: request code -->
+    <div id="form-recover" style="display:none">
+      <!-- Step 1: Request -->
+      <div id="rec-step1">
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6">
+          Informe seu usuário e e-mail. Enviaremos um código de recuperação.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nome de Usuário</label>
+          <input class="form-input" id="rec-user" type="text" placeholder="seu_usuario" autocomplete="username">
+        </div>
+        <div class="form-error" id="rec-error"></div>
+        <button class="btn-auth" id="btn-req-code" onclick="doRequestCode()">📧 Enviar Código por E-mail</button>
+      </div>
+      <!-- Step 2: Enter code + new password -->
+      <div id="rec-step2" style="display:none">
+        <div style="font-size:13px;color:var(--green-light);margin-bottom:14px;line-height:1.6">
+          ✅ Código enviado para o e-mail cadastrado! Verifique também o spam.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Código Recebido por E-mail</label>
+          <input class="form-input" id="rec-code" type="text" placeholder="Ex: A3F7B2C1" autocomplete="off" style="letter-spacing:4px;text-transform:uppercase;font-size:16px;text-align:center">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nova Senha</label>
+          <input class="form-input" id="rec-pass" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar Nova Senha</label>
+          <input class="form-input" id="rec-pass2" type="password" placeholder="Repita a nova senha" autocomplete="new-password">
+        </div>
+        <div class="form-error" id="rec-error2"></div>
+        <button class="btn-auth" id="btn-recover" onclick="doRecover()">🔑 Redefinir Senha</button>
+        <div style="text-align:center;margin-top:10px">
+          <button onclick="document.getElementById('rec-step2').style.display='none';document.getElementById('rec-step1').style.display='';" style="background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;text-decoration:underline;padding:0">← Não recebi, tentar novamente</button>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:12px">
+        <button onclick="authTab('login')" style="background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;text-decoration:underline;padding:0">← Voltar ao login</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -7119,6 +7168,53 @@ function registerShopSSEHandlers() {
       if (lr.gameState) { G = lr.gameState; updateUI(); updateVipBanner(); }
     });
   });
+}
+
+
+// ══════════════════════════════════════════════════════════
+// RECUPERAÇÃO DE SENHA AUTOMÁTICA
+// ══════════════════════════════════════════════════════════
+
+// Step 1: Request code via email
+async function doRequestCode() {
+  const u   = (document.getElementById('rec-user')||{value:''}).value.trim().toLowerCase();
+  const err = document.getElementById('rec-error');
+  if (!u) { err.textContent='Informe o nome de usuário.'; return; }
+  const btn = document.getElementById('btn-req-code');
+  btn.disabled=true; btn.textContent='Enviando...';
+  const res = await api('POST', '/api/recover/request', { username: u });
+  btn.disabled=false; btn.textContent='📧 Enviar Código por E-mail';
+  if (res.error) { err.textContent=res.error; return; }
+  err.textContent='';
+  // Show step 2 regardless (prevents user enumeration)
+  document.getElementById('rec-step1').style.display='none';
+  document.getElementById('rec-step2').style.display='';
+}
+
+// Step 2: Confirm code + set new password
+async function doRecover() {
+  const u     = (document.getElementById('rec-user')||{value:''}).value.trim().toLowerCase();
+  const code  = (document.getElementById('rec-code')||{value:''}).value.trim().toUpperCase();
+  const pass  = (document.getElementById('rec-pass')||{value:''}).value;
+  const pass2 = (document.getElementById('rec-pass2')||{value:''}).value;
+  const err   = document.getElementById('rec-error2');
+  if (!u||!code||!pass) { err.textContent='Preencha todos os campos.'; return; }
+  if (pass !== pass2)   { err.textContent='As senhas não coincidem.'; return; }
+  if (pass.length < 6)  { err.textContent='Nova senha: mínimo 6 caracteres.'; return; }
+  const btn = document.getElementById('btn-recover');
+  btn.disabled=true; btn.textContent='Verificando...';
+  const res = await api('POST', '/api/recover', { username:u, newPassword:pass, code });
+  btn.disabled=false; btn.textContent='🔑 Redefinir Senha';
+  if (res.error) { err.textContent=res.error; return; }
+  err.style.color='var(--green-light)';
+  err.textContent='✅ Senha redefinida com sucesso!';
+  setTimeout(() => {
+    err.style.color='';
+    authTab('login');
+    // Pre-fill username
+    const lUser = document.getElementById('l-user');
+    if (lUser) lUser.value = u;
+  }, 1500);
 }
 
 </script>

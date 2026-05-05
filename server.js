@@ -397,7 +397,8 @@ async function handleRequest(req, res) {
     const db = loadDB();
     const key = username.toLowerCase();
     if (db.users[key]) { send(res, 409, { error: 'Nome de usuario ja existe.' }); return; }
-    db.users[key] = { username, password: hashPassword(password), createdAt: Date.now(), lastLogin: Date.now(), gameState: null };
+    const safeEmail = typeof body.email === 'string' && body.email.includes('@') ? safeString(body.email, 100) : null;
+    db.users[key] = { username, password: hashPassword(password), email: safeEmail, createdAt: Date.now(), lastLogin: Date.now(), gameState: null };
     saveDB(db);
     send(res, 201, { token: makeToken(key), username });
     return;
@@ -2193,6 +2194,129 @@ async function handleRequest(req, res) {
     if (!order || order.username !== username) { send(res, 404, { error: 'Pedido nao encontrado.' }); return; }
     send(res, 200, { status: order.status, completedAt: order.completedAt });
     return;
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RECUPERAÇÃO DE SENHA
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RECUPERAÇÃO DE SENHA AUTOMÁTICA (via e-mail — Resend.com)
+  //
+  // Configuração:
+  //   1. Crie conta gratuita em resend.com (3.000 emails/mês grátis)
+  //   2. Gere uma API Key em: resend.com/api-keys
+  //   3. Adicione variável de ambiente no Railway:
+  //        RESEND_API_KEY = re_xxxxxxxxxxxxxxxxx
+  //        GAME_EMAIL_FROM = noreply@seudominio.com  (ou use onboarding@resend.dev para teste)
+  //        BASE_URL = https://seu-app.up.railway.app
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const RESEND_API_KEY  = process.env.RESEND_API_KEY || '';
+  const GAME_EMAIL_FROM = process.env.GAME_EMAIL_FROM || 'Terras de Arathorn <onboarding@resend.dev>';
+
+  async function sendRecoveryEmail(toEmail, username, code, expiresAt) {
+    if (!RESEND_API_KEY) {
+      console.warn('[EMAIL] RESEND_API_KEY não configurado — email não enviado.');
+      return false;
+    }
+    const expiryStr = new Date(expiresAt).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'});
+    const body = {
+      from: GAME_EMAIL_FROM,
+      to: [toEmail],
+      subject: '🔑 Recuperação de Senha — Terras de Arathorn',
+      html: `
+        <div style="font-family:Georgia,serif;background:#0a0806;color:#d4b483;padding:32px;max-width:480px;margin:0 auto;border-radius:8px">
+          <div style="text-align:center;margin-bottom:24px">
+            <div style="font-size:32px">⚔</div>
+            <div style="font-family:serif;font-size:22px;color:#c9a84c;letter-spacing:2px">TERRAS DE ARATHORN</div>
+          </div>
+          <p>Olá, <b>${username}</b>!</p>
+          <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
+          <p>Seu <b>código de recuperação</b> é:</p>
+          <div style="background:#1a1208;border:2px solid #c9a84c;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
+            <span style="font-size:28px;font-family:monospace;color:#c9a84c;letter-spacing:8px">${code}</span>
+          </div>
+          <p style="font-size:13px;color:#999">Este código expira em: <b>${expiryStr}</b></p>
+          <p style="font-size:13px;color:#999">Se você não solicitou a recuperação, ignore este email. Sua senha permanece inalterada.</p>
+          <hr style="border-color:#333;margin:24px 0">
+          <p style="font-size:12px;color:#666;text-align:center">Terras de Arathorn — RPG Medieval</p>
+        </div>
+      `
+    };
+    try {
+      const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+RESEND_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const d = await r.json();
+      if (!r.ok) { console.error('[EMAIL] Resend error:', d); return false; }
+      console.log('[EMAIL] Email enviado para', toEmail, '— id:', d.id);
+      return true;
+    } catch(e) {
+      console.error('[EMAIL] Fetch error:', e.message);
+      return false;
+    }
+  }
+
+  // ── POST /api/recover/request — solicitar código por email ──────────────
+  if (method === 'POST' && url === '/api/recover/request') {
+    const body = await readBody(req);
+    const username = safeString(body.username||'', 24).toLowerCase().trim();
+    if (!username) { send(res,400,{error:'Informe o nome de usuário.'}); return; }
+    const db = loadDB();
+    const user = db.users[username];
+    // Always return success to prevent user enumeration
+    if (!user || !user.email) {
+      send(res,200,{ok:true, msg:'Se este usuário existir e tiver e-mail cadastrado, você receberá o código em breve.'});
+      return;
+    }
+    // Rate limit: only 1 code per 5 minutes per user
+    if (!db.recoveryCodes) db.recoveryCodes = {};
+    const existing = db.recoveryCodes[username];
+    if (existing && (Date.now() - existing.createdAt) < 5*60*1000) {
+      send(res,429,{error:'Aguarde 5 minutos antes de solicitar outro código.'}); return;
+    }
+    // Generate code
+    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const expiresAt = Date.now() + 30 * 60 * 1000; // 30 min
+    db.recoveryCodes[username] = { code, createdAt: Date.now(), expiresAt };
+    saveDB(db);
+    const sent = await sendRecoveryEmail(user.email, user.username || username, code, expiresAt);
+    if (!sent && !RESEND_API_KEY) {
+      // Dev mode: return code directly (REMOVE IN PRODUCTION)
+      console.log('[RECOVER DEV] Código para', username, ':', code);
+    }
+    send(res,200,{ok:true, msg:'Se este usuário existir e tiver e-mail cadastrado, você receberá o código em breve.'});
+    return;
+  }
+
+  // ── POST /api/recover — confirmar código + trocar senha ─────────────────
+  if (method === 'POST' && url === '/api/recover') {
+    const body = await readBody(req);
+    const username    = safeString(body.username||'', 24).toLowerCase().trim();
+    const newPassword = typeof body.newPassword === 'string' ? body.newPassword : '';
+    const code        = safeString(body.code||'', 10).trim().toUpperCase();
+    if (!username||!newPassword||!code) { send(res,400,{error:'Preencha todos os campos.'}); return; }
+    if (newPassword.length < 6 || newPassword.length > 200) { send(res,400,{error:'Nova senha: 6-200 caracteres.'}); return; }
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user) { send(res,400,{error:'Dados inválidos.'}); return; }
+    if (!db.recoveryCodes) db.recoveryCodes = {};
+    const rec = db.recoveryCodes[username];
+    if (!rec) { send(res,400,{error:'Nenhum código ativo. Solicite novamente.'}); return; }
+    if (Date.now() > rec.expiresAt) {
+      delete db.recoveryCodes[username]; saveDB(db);
+      send(res,400,{error:'Código expirado. Solicite um novo.'}); return;
+    }
+    if (rec.code !== code) { send(res,400,{error:'Código incorreto.'}); return; }
+    user.password = hashPassword(newPassword);
+    delete db.recoveryCodes[username];
+    saveDB(db);
+    console.log('[RECOVER] Senha redefinida:', username);
+    send(res,200,{ok:true}); return;
   }
 
   send(res, 404, { error: 'Endpoint nao encontrado.' });
