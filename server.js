@@ -311,6 +311,31 @@ function calcSellPrice(invId) {
   return Math.max(1, price);
 }
 
+
+// ─── APPLY SHOP REWARDS ────────────────────────────────────────────────────
+function applyShopRewards(g, rewards) {
+  if (!g) return;
+  if (rewards.gold) g.gold = (g.gold||0) + rewards.gold;
+  if (rewards.items) {
+    if (!g.inventory) g.inventory = [];
+    rewards.items.forEach(id => g.inventory.push(id));
+  }
+  if (rewards.consumables) {
+    if (!g.consumables) g.consumables = [];
+    rewards.consumables.forEach(id => g.consumables.push(id));
+  }
+  if (rewards.vipDays) {
+    const now = Date.now();
+    const current = g.vipUntil || now;
+    g.vipUntil = Math.max(current, now) + rewards.vipDays * 24 * 60 * 60 * 1000;
+    g.xpBonus = (g.xpBonus||0); // VIP XP bonus applied in gainXP check
+  }
+  if (rewards.log) {
+    if (!g.log) g.log = [];
+    g.log.unshift({ msg: rewards.log, cls: 'good' });
+  }
+}
+
 // ROUTES
 async function handleRequest(req, res) {
   const url = req.url.split('?')[0];
@@ -1875,6 +1900,298 @@ async function handleRequest(req, res) {
 
     saveDB(db);
     send(res,200,{ok:true, distributions, partySize: size});
+    return;
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LOJA DO REINO — Sistema de Monetização com PIX (Mercado Pago)
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // CONFIGURAÇÃO NECESSÁRIA:
+  //   1. Criar conta em mercadopago.com.br
+  //   2. Acessar: Seu negócio → Credenciais → Credenciais de produção
+  //   3. Copiar o Access Token e colar em MP_ACCESS_TOKEN abaixo
+  //   4. Configurar webhook URL: https://seudominio.com/api/shop/webhook
+  //      (no painel do Mercado Pago → Webhooks → Adicionar)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || 'SEU_ACCESS_TOKEN_AQUI';
+  const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET || 'SEU_WEBHOOK_SECRET_AQUI';
+  const BASE_URL = process.env.BASE_URL || 'https://seudominio.up.railway.app';
+
+  // Catálogo de produtos
+  const SHOP_CATALOG = {
+    'pack_iniciante': {
+      id: 'pack_iniciante',
+      name: '⚔ Pack Iniciante',
+      desc: '5.000 ouro + Espada +3 + Armadura Excelente + 3 Pedras Prist',
+      price: 9.90,
+      type: 'pack',
+      rewards: {
+        gold: 5000,
+        items: ['ew1_exc'], // excellent weapon tier 1
+        consumables: ['prist_s','prist_s','prist_s'],
+        log: '⚔ Pack Iniciante ativado! +5.000 ouro, equipamentos e pedras adicionados!'
+      }
+    },
+    'pack_guerreiro': {
+      id: 'pack_guerreiro',
+      name: '🛡 Pack Guerreiro',
+      desc: '20.000 ouro + Arma Épica + Set Épico + 5 Pedras Prist + 2 Ravika',
+      price: 24.90,
+      type: 'pack',
+      rewards: {
+        gold: 20000,
+        items: ['ew3_epc'],
+        consumables: ['prist_s','prist_s','prist_s','prist_s','prist_s','ravika_s','ravika_s'],
+        log: '🛡 Pack Guerreiro ativado! Equipamentos épicos e pedras adicionados!'
+      }
+    },
+    'pack_lendario': {
+      id: 'pack_lendario',
+      name: '👑 Pack Lendário',
+      desc: '100.000 ouro + Arma Suprema + Set Supremo completo + 10 Pedras + VIP 30 dias',
+      price: 59.90,
+      type: 'pack',
+      rewards: {
+        gold: 100000,
+        items: ['ew5_sup'],
+        consumables: ['prist_s','prist_s','prist_s','prist_s','prist_s','ravika_s','ravika_s','ravika_s','prist_m','ravika_m'],
+        vipDays: 30,
+        log: '👑 Pack Lendário ativado! Você está pronto para a batalha!'
+      }
+    },
+    'ouro_pequeno': {
+      id: 'ouro_pequeno',
+      name: '⬡ Saco de Ouro',
+      desc: '10.000 ouro para gastar na loja e taverna',
+      price: 4.90,
+      type: 'gold',
+      rewards: { gold: 10000, log: '⬡ +10.000 ouro adicionados à sua bolsa!' }
+    },
+    'ouro_medio': {
+      id: 'ouro_medio',
+      name: '⬡⬡ Baú de Ouro',
+      desc: '50.000 ouro — melhor custo-benefício',
+      price: 14.90,
+      type: 'gold',
+      rewards: { gold: 50000, log: '⬡ +50.000 ouro adicionados à sua bolsa!' }
+    },
+    'ouro_grande': {
+      id: 'ouro_grande',
+      name: '⬡⬡⬡ Tesouro Real',
+      desc: '200.000 ouro + bônus de 20% — para quem joga sério',
+      price: 39.90,
+      type: 'gold',
+      rewards: { gold: 240000, log: '⬡ +240.000 ouro (bônus 20% incluso) adicionados!' }
+    },
+    'vip_30': {
+      id: 'vip_30',
+      name: '👑 VIP — 30 dias',
+      desc: '+50% XP em todas missões · +25% ouro · Badge VIP dourado · Missões exclusivas',
+      price: 19.90,
+      type: 'vip',
+      rewards: { vipDays: 30, log: '👑 VIP ativado por 30 dias! Aproveite os bônus!' }
+    },
+    'vip_90': {
+      id: 'vip_90',
+      name: '👑👑 VIP — 90 dias',
+      desc: '+50% XP · +25% ouro · Badge especial · Preço com 33% de desconto',
+      price: 39.90,
+      type: 'vip',
+      rewards: { vipDays: 90, log: '👑 VIP ativado por 90 dias! Boa jornada, herói!' }
+    },
+    'pedras_prist': {
+      id: 'pedras_prist',
+      name: '💠 Pacote Prist (x10)',
+      desc: '10 Pedras Prist para refinar itens até +6',
+      price: 7.90,
+      type: 'consumable',
+      rewards: {
+        consumables: ['prist_s','prist_s','prist_s','prist_s','prist_s','prist_s','prist_s','prist_s','prist_s','prist_s'],
+        log: '💠 10 Pedras Prist adicionadas ao inventário!'
+      }
+    },
+    'pedras_ravika': {
+      id: 'pedras_ravika',
+      name: '🌑 Pacote Ravika (x5)',
+      desc: '5 Pedras Ravika para refinar itens até +11',
+      price: 14.90,
+      type: 'consumable',
+      rewards: {
+        consumables: ['ravika_s','ravika_s','ravika_s','ravika_s','ravika_s'],
+        log: '🌑 5 Pedras Ravika adicionadas ao inventário!'
+      }
+    },
+  };
+
+  // ── GET /api/shop/catalog — lista produtos ─────────────────────────────
+  if (method === 'GET' && url === '/api/shop/catalog') {
+    const products = Object.values(SHOP_CATALOG).map(p => ({
+      id: p.id, name: p.name, desc: p.desc, price: p.price, type: p.type
+    }));
+    send(res, 200, { products });
+    return;
+  }
+
+  // ── POST /api/shop/buy — criar cobrança PIX ────────────────────────────
+  if (method === 'POST' && url === '/api/shop/buy') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const { productId } = await readBody(req);
+    const product = SHOP_CATALOG[productId];
+    if (!product) { send(res, 404, { error: 'Produto nao encontrado.' }); return; }
+
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user || !user.gameState) { send(res, 400, { error: 'Personagem nao encontrado.' }); return; }
+
+    // Criar cobrança no Mercado Pago via API PIX
+    try {
+      const idempotencyKey = username + '_' + productId + '_' + Date.now();
+      const mpBody = {
+        transaction_amount: product.price,
+        description: 'Terras de Arathorn - ' + product.name,
+        payment_method_id: 'pix',
+        payer: {
+          email: (user.email || username + '@arathorn.game'),
+          first_name: user.gameState.name || username,
+          last_name: 'Arathorn',
+          identification: { type: 'CPF', number: '00000000000' }
+        },
+        external_reference: username + '|' + productId + '|' + Date.now(),
+        notification_url: BASE_URL + '/api/shop/webhook',
+      };
+
+      const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + MP_ACCESS_TOKEN,
+          'X-Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify(mpBody)
+      });
+
+      const mpData = await mpRes.json();
+
+      if (!mpRes.ok || !mpData.point_of_interaction) {
+        console.error('[SHOP] Mercado Pago error:', JSON.stringify(mpData));
+        send(res, 500, { error: 'Erro ao gerar PIX. Tente novamente.' }); return;
+      }
+
+      const pix = mpData.point_of_interaction.transaction_data;
+
+      // Salvar pedido pendente
+      if (!db.pendingOrders) db.pendingOrders = {};
+      db.pendingOrders[mpData.id] = {
+        mpPaymentId: mpData.id,
+        username,
+        productId,
+        price: product.price,
+        status: 'pending',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 60 * 1000, // 30 min
+      };
+      saveDB(db);
+
+      send(res, 200, {
+        ok: true,
+        paymentId: mpData.id,
+        pixCopiaECola: pix.qr_code,
+        pixQrCodeBase64: pix.qr_code_base64,
+        price: product.price,
+        productName: product.name,
+        expiresIn: 1800, // 30 minutes in seconds
+      });
+    } catch(e) {
+      console.error('[SHOP] Fetch error:', e.message);
+      send(res, 500, { error: 'Erro de conexao com Mercado Pago.' });
+    }
+    return;
+  }
+
+  // ── POST /api/shop/webhook — receber confirmacao de pagamento ──────────
+  if (method === 'POST' && url.startsWith('/api/shop/webhook')) {
+    const body = await readBody(req);
+    // Mercado Pago sends: { action: 'payment.updated', data: { id: '123' } }
+    if (body.action !== 'payment.updated' && body.type !== 'payment') {
+      send(res, 200, { ok: true }); return;
+    }
+    const paymentId = (body.data && body.data.id) ? String(body.data.id) : null;
+    if (!paymentId) { send(res, 200, { ok: true }); return; }
+
+    // Verificar status no Mercado Pago
+    try {
+      const mpRes = await fetch('https://api.mercadopago.com/v1/payments/' + paymentId, {
+        headers: { 'Authorization': 'Bearer ' + MP_ACCESS_TOKEN }
+      });
+      const mpData = await mpRes.json();
+
+      if (mpData.status !== 'approved') {
+        send(res, 200, { ok: true }); return;
+      }
+
+      // Encontrar pedido
+      const db = loadDB();
+      if (!db.pendingOrders) db.pendingOrders = {};
+      const order = db.pendingOrders[paymentId];
+      if (!order) { send(res, 200, { ok: true }); return; }
+      if (order.status === 'completed') { send(res, 200, { ok: true }); return; }
+
+      // Aplicar recompensas
+      const product = SHOP_CATALOG[order.productId];
+      const user = db.users[order.username];
+      if (!product || !user || !user.gameState) {
+        send(res, 200, { ok: true }); return;
+      }
+
+      applyShopRewards(user.gameState, product.rewards);
+
+      order.status = 'completed';
+      order.completedAt = Date.now();
+
+      // Log de compras
+      if (!db.purchaseLog) db.purchaseLog = [];
+      db.purchaseLog.push({
+        username: order.username,
+        productId: order.productId,
+        price: order.price,
+        paymentId,
+        ts: Date.now()
+      });
+
+      saveDB(db);
+
+      // Notificar jogador em tempo real
+      sendSSE(order.username, 'purchase_confirmed', {
+        productName: product.name,
+        rewards: {
+          gold: product.rewards.gold || 0,
+          vipDays: product.rewards.vipDays || 0,
+          items: product.rewards.items?.length || 0,
+          consumables: product.rewards.consumables?.length || 0,
+        }
+      });
+
+      console.log('[SHOP] Compra confirmada:', order.username, product.name, 'R$'+order.price);
+    } catch(e) {
+      console.error('[SHOP] Webhook error:', e.message);
+    }
+    send(res, 200, { ok: true });
+    return;
+  }
+
+  // ── POST /api/shop/check — checar status de pagamento (polling) ────────
+  if (method === 'GET' && url.startsWith('/api/shop/check/')) {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const paymentId = url.slice('/api/shop/check/'.length);
+    const db = loadDB();
+    const order = (db.pendingOrders||{})[paymentId];
+    if (!order || order.username !== username) { send(res, 404, { error: 'Pedido nao encontrado.' }); return; }
+    send(res, 200, { status: order.status, completedAt: order.completedAt });
     return;
   }
 

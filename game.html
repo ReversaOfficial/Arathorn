@@ -713,6 +713,22 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
   }
 }
 
+/* ── REAL MONEY SHOP ── */
+.product-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s;position:relative;overflow:hidden}
+.product-card:hover{border-color:var(--border-light)}
+.product-card.pack{border-color:var(--gold-dark)}
+.product-card.pack::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.product-card.vip{border-color:#7040a0}
+.product-card.vip::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#a070d0,transparent)}
+.product-name{font-family:'Cinzel',serif;font-size:13px;font-weight:600;color:var(--text-primary)}
+.product-desc{font-size:12px;color:var(--text-secondary);line-height:1.5;flex:1}
+.product-price{font-family:'Cinzel',serif;font-size:20px;color:var(--green-light);font-weight:700}
+.product-price-sub{font-size:10px;color:var(--text-muted)}
+.btn-buy-pix{width:100%;padding:10px;background:linear-gradient(135deg,#00875a,#00a366);border:none;border-radius:var(--radius);color:#fff;font-family:'Cinzel',serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity .2s}
+.btn-buy-pix:hover{opacity:.9}
+.btn-buy-pix:disabled{opacity:.4;cursor:not-allowed}
+.vip-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(160,100,220,.2);border:1px solid rgba(160,100,220,.4);border-radius:3px;font-size:10px;color:#c090e0;font-family:Cinzel,serif}
+
 </style>
 </head>
 <body>
@@ -893,6 +909,8 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
       <div class="nav-item" data-page="loja" data-label="Loja" onclick="navTo(this)"><span class="nav-icon">⚒️</span> Ferreiro</div>
       <div class="nav-item" data-page="alquimia" data-label="Alquimia" onclick="navTo(this)"><span class="nav-icon">🧪</span> Alquimista</div>
       <div class="nav-item" data-page="fornalha" data-label="Fornalha" onclick="navTo(this)"><span class="nav-icon">🔥</span> Fornalha Mestra</div>
+      <div class="nav-section-label">Loja Real</div>
+      <div class="nav-item" data-page="loja-real" data-label="Loja R$" onclick="navTo(this)"><span class="nav-icon">💎</span> Loja Real</div>
       <div class="nav-section-label">Social</div>
       <div class="nav-item" data-page="amigos" data-label="Amigos" onclick="navTo(this)"><span class="nav-icon">👥</span> Amigos <span class="nav-badge" id="friend-req-badge" style="display:none">!</span></div>
       <div class="nav-item" data-page="party" data-label="Party" onclick="navTo(this)"><span class="nav-icon">🤝</span> Party <span class="nav-badge" id="party-badge" style="display:none">!</span></div>
@@ -1670,6 +1688,76 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
             <div style="font-size:12px;color:var(--text-secondary);line-height:1.7">
               💡 <b>Como funciona:</b> Vá às Missões e inicie uma normal. Se for o líder da party, ao vencer, as recompensas serão distribuídas automaticamente entre todos os membros conforme a tabela acima.
             </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- LOJA REAL -->
+      <div class="page" id="page-loja-real">
+        <div class="page-title">💎 Loja do Reino</div>
+        <div class="page-sub">Apoie o jogo e ganhe vantagens exclusivas — pagamento via PIX instantâneo</div>
+
+        <!-- VIP status banner -->
+        <div id="vip-banner" style="display:none;background:linear-gradient(135deg,#1a1200,#2a1f00);border:1px solid var(--gold);border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+          <span style="font-size:28px">👑</span>
+          <div>
+            <div style="font-family:Cinzel,serif;font-size:13px;color:var(--gold)">VIP Ativo</div>
+            <div style="font-size:12px;color:var(--text-secondary)" id="vip-expires-text">—</div>
+          </div>
+          <div style="margin-left:auto;text-align:right;font-size:11px;color:var(--green-light)">
+            +50% XP<br>+25% Ouro
+          </div>
+        </div>
+
+        <!-- Category tabs -->
+        <div class="tabs" style="margin-bottom:14px">
+          <div class="tab active" onclick="shopRealTab(this,'packs')">⚔ Packs</div>
+          <div class="tab" onclick="shopRealTab(this,'gold')">⬡ Ouro</div>
+          <div class="tab" onclick="shopRealTab(this,'vip')">👑 VIP</div>
+          <div class="tab" onclick="shopRealTab(this,'stones')">💠 Pedras</div>
+        </div>
+
+        <div id="shop-real-packs" class="grid-2"></div>
+        <div id="shop-real-gold"  class="grid-2" style="display:none"></div>
+        <div id="shop-real-vip"   class="grid-2" style="display:none"></div>
+        <div id="shop-real-stones" class="grid-2" style="display:none"></div>
+
+        <div style="margin-top:16px;padding:12px;background:var(--bg-dark);border-radius:var(--radius);font-size:11px;color:var(--text-muted);line-height:1.7">
+          🔒 Pagamento 100% seguro via PIX — processado pelo Mercado Pago<br>
+          ⚡ Ativação instantânea após confirmação do pagamento<br>
+          📧 Dúvidas? Entre em contato pelo chat do reino
+        </div>
+      </div>
+
+      <!-- PIX MODAL (shown when purchase initiated) -->
+      <div id="pix-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:3000;align-items:center;justify-content:center;padding:16px">
+        <div style="background:var(--bg-panel);border:1px solid var(--gold);border-radius:var(--radius-lg);padding:24px;max-width:400px;width:100%;text-align:center;position:relative">
+          <button onclick="closePixModal()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+          <div style="font-family:Cinzel,serif;font-size:16px;color:var(--gold);margin-bottom:4px">💎 Pagamento PIX</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px" id="pix-product-name">—</div>
+
+          <!-- QR Code -->
+          <div id="pix-qr-wrap" style="margin:0 auto 14px;width:200px;height:200px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:8px">
+            <img id="pix-qr-img" src="" alt="QR Code PIX" style="width:100%;height:100%;object-fit:contain">
+          </div>
+
+          <!-- Copia e cola -->
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Ou copie o código PIX:</div>
+          <div style="display:flex;gap:6px;margin-bottom:14px">
+            <input id="pix-code-inp" readonly style="flex:1;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;color:var(--text-primary);font-size:11px;font-family:monospace" value="">
+            <button class="btn btn-gold btn-sm" onclick="copyPixCode()">Copiar</button>
+          </div>
+
+          <!-- Price + timer -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div style="font-size:18px;color:var(--gold);font-weight:700" id="pix-price-display">R$ 0,00</div>
+            <div style="font-size:12px;color:var(--text-muted)">Expira em: <span id="pix-timer" style="color:var(--red-light)">30:00</span></div>
+          </div>
+
+          <!-- Status -->
+          <div id="pix-status" style="padding:10px;border-radius:var(--radius);background:var(--bg-dark);font-size:13px;color:var(--text-secondary)">
+            ⏳ Aguardando pagamento...
           </div>
         </div>
       </div>
@@ -2727,6 +2815,16 @@ function updateUI() {
   }
   se('p-lvl-badge', 'Nv. '+G.level);
   se('p-clan-badge', G.clanName||'Sem Clã');
+  // VIP indicator
+  const _vipActive = G.vipUntil && G.vipUntil > Date.now();
+  const _vipBadge = document.getElementById('p-role-badge');
+  if (_vipBadge && _vipActive && !G.clanRole) {
+    _vipBadge.style.display = '';
+    _vipBadge.textContent = '👑 VIP';
+    _vipBadge.style.color = '#ffd700';
+    _vipBadge.style.borderColor = '#ffd70055';
+    _vipBadge.style.background = '#ffd70015';
+  }
   se('rp-name', G.name);
   se('rp-level', 'Nível ' + G.level + ' • ' + race.name);
   // XP badge in right panel
@@ -2897,6 +2995,7 @@ function navTo(el) {
   if (page==='amigos')     { renderAmigos(); }
   if (page==='party')      { renderParty(); }
   if (page==='chat')       { initChatPage(); }
+  if (page==='loja-real')  { initShopReal(); }
   if (page==='inventario') { invTab(document.querySelector('#page-inventario .tab'), 'equip'); }
   if (page==='fornalha')   { renderForge(); }
   if (page==='conquistas') renderAchievements();
@@ -3804,7 +3903,9 @@ function openCombat(m, enemyName) {
 function finalizeCombat(won, m, enemyName, finalHp, clog) {
   if (won) {
     // ── VITÓRIA ──────────────────────────────────────────────────────────
-    const gold = Math.round(m.gold[0] + Math.random() * (m.gold[1] - m.gold[0]));
+    const _isVip = G.vipUntil && G.vipUntil > Date.now();
+    let gold = Math.round(m.gold[0] + Math.random() * (m.gold[1] - m.gold[0]));
+    if (_isVip) gold = Math.round(gold * 1.25); // VIP +25% gold
     let xp = Math.round(m.xp[0] + Math.random() * (m.xp[1] - m.xp[0]));
     xp = Math.round(xp * (1 + (G.xpBonus||0)));
     // HP reflects real remaining HP from combat
@@ -4024,6 +4125,9 @@ const CLASS_LEVEL_GAINS = {
 };
 
 function gainXP(amount) {
+  // VIP bonus: +50% XP
+  const isVip = G.vipUntil && G.vipUntil > Date.now();
+  if (isVip) amount = Math.round(amount * 1.5);
   G.xp += amount;
   while (G.xp >= G.xpNext) {
     G.xp -= G.xpNext;
@@ -4266,6 +4370,7 @@ function initGame() {
   setTimeout(registerFriendSSEHandlers, 1000);
   setTimeout(registerTavernSSEHandlers, 1200);
   setTimeout(registerPartySSEHandlers, 1300);
+  setTimeout(registerShopSSEHandlers, 1400);
   setTimeout(loadPartyState, 1500);
   if (!G.friends) G.friends = [];
   updateUI();
@@ -6805,6 +6910,214 @@ function registerPartySSEHandlers() {
     addLog('🤝 Party "'+d.missionName+'": +'+d.xp+' XP, +'+d.gold+' ouro ('+d.pct+'%)', 'good');
     // Reload state to reflect XP/gold gain
     api('GET','/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════
+// LOJA REAL — PIX / Mercado Pago
+// ══════════════════════════════════════════════════════════
+
+let _shopProducts = [];
+let _pixPaymentId = null;
+let _pixTimerInt  = null;
+let _pixPollInt   = null;
+
+const SHOP_TYPE_MAP = {
+  pack: 'packs', gold: 'gold', vip: 'vip', consumable: 'stones'
+};
+
+async function initShopReal() {
+  // VIP status banner
+  updateVipBanner();
+  // Load products
+  if (!_shopProducts.length) {
+    const res = await api('GET', '/api/shop/catalog');
+    _shopProducts = res.products || [];
+  }
+  renderShopReal('packs');
+}
+
+function updateVipBanner() {
+  const banner = document.getElementById('vip-banner');
+  const text   = document.getElementById('vip-expires-text');
+  if (!banner) return;
+  const isVip = G.vipUntil && G.vipUntil > Date.now();
+  banner.style.display = isVip ? 'flex' : 'none';
+  if (isVip && text) {
+    const d = new Date(G.vipUntil);
+    text.textContent = 'Ativo até ' + d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+  }
+}
+
+function shopRealTab(el, tab) {
+  document.querySelectorAll('#page-loja-real .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['packs','gold','vip','stones'].forEach(t => {
+    const e = document.getElementById('shop-real-'+t);
+    if (e) e.style.display = t===tab ? '' : 'none';
+  });
+  renderShopReal(tab);
+}
+
+function renderShopReal(tab) {
+  const container = document.getElementById('shop-real-' + tab);
+  if (!container) return;
+  const typeFilter = { packs:'pack', gold:'gold', vip:'vip', stones:'consumable' }[tab];
+  const products = _shopProducts.filter(p => p.type === typeFilter);
+
+  if (!products.length) {
+    container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;font-style:italic;padding:20px;grid-column:1/-1;text-align:center">Carregando produtos...</div>';
+    return;
+  }
+
+  container.innerHTML = products.map(p => {
+    const isVipCard = p.type === 'vip';
+    const isPackCard = p.type === 'pack';
+    const priceStr = 'R$ ' + p.price.toFixed(2).replace('.', ',');
+    return '<div class="product-card '+(isPackCard?'pack':isVipCard?'vip':'')+'">'
+      + '<div class="product-name">'+p.name+'</div>'
+      + '<div class="product-desc">'+p.desc+'</div>'
+      + '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:4px">'
+      +   '<div>'
+      +     '<div class="product-price">'+priceStr+'</div>'
+      +     '<div class="product-price-sub">pagamento único via PIX</div>'
+      +   '</div>'
+      + '</div>'
+      + '<button class="btn-buy-pix" data-id="'+p.id+'" onclick="initPixPayment(this)">'
+      +   '<span>⚡</span> Pagar com PIX'
+      + '</button>'
+      + '</div>';
+  }).join('');
+}
+
+async function initPixPayment(btn) {
+  const productId = btn.dataset.id;
+  const product = _shopProducts.find(p => p.id === productId);
+  if (!product) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> Gerando PIX...';
+
+  const res = await api('POST', '/api/shop/buy', { productId });
+
+  btn.disabled = false;
+  btn.innerHTML = '<span>⚡</span> Pagar com PIX';
+
+  if (res.error) {
+    toast('Erro: ' + res.error, 'bad');
+    return;
+  }
+
+  // Show PIX modal
+  _pixPaymentId = res.paymentId;
+  openPixModal(res, product);
+}
+
+function openPixModal(data, product) {
+  const modal = document.getElementById('pix-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
+  // Product name and price
+  document.getElementById('pix-product-name').textContent = product.name;
+  document.getElementById('pix-price-display').textContent = 'R$ ' + product.price.toFixed(2).replace('.',',');
+
+  // QR Code image
+  const qrImg = document.getElementById('pix-qr-img');
+  if (data.pixQrCodeBase64) {
+    qrImg.src = 'data:image/png;base64,' + data.pixQrCodeBase64;
+    document.getElementById('pix-qr-wrap').style.display = 'flex';
+  } else {
+    document.getElementById('pix-qr-wrap').style.display = 'none';
+  }
+
+  // Copia e cola
+  const inp = document.getElementById('pix-code-inp');
+  if (inp) inp.value = data.pixCopiaECola || '';
+
+  // Status
+  const statusEl = document.getElementById('pix-status');
+  if (statusEl) statusEl.innerHTML = '⏳ Aguardando pagamento... Escaneie o QR ou copie o código.';
+
+  // Countdown timer
+  clearInterval(_pixTimerInt);
+  let secsLeft = data.expiresIn || 1800;
+  const timerEl = document.getElementById('pix-timer');
+  _pixTimerInt = setInterval(() => {
+    secsLeft--;
+    if (secsLeft <= 0) {
+      clearInterval(_pixTimerInt);
+      if (timerEl) timerEl.textContent = 'Expirado';
+      if (statusEl) statusEl.innerHTML = '❌ PIX expirado. Inicie uma nova compra.';
+      clearInterval(_pixPollInt);
+      return;
+    }
+    const m = Math.floor(secsLeft/60), s = secsLeft%60;
+    if (timerEl) timerEl.textContent = m+':'+String(s).padStart(2,'0');
+  }, 1000);
+
+  // Poll for payment confirmation every 5 seconds
+  clearInterval(_pixPollInt);
+  _pixPollInt = setInterval(async () => {
+    const check = await api('GET', '/api/shop/check/'+_pixPaymentId);
+    if (check.status === 'completed') {
+      clearInterval(_pixPollInt);
+      clearInterval(_pixTimerInt);
+      if (statusEl) statusEl.innerHTML = '✅ <b style="color:var(--green-light)">Pagamento confirmado! Recompensas ativadas!</b>';
+      // Reload game state
+      setTimeout(async () => {
+        const lr = await api('GET', '/api/load');
+        if (lr.gameState) { G = lr.gameState; updateUI(); updateVipBanner(); }
+        setTimeout(closePixModal, 2000);
+      }, 1000);
+    }
+  }, 5000);
+}
+
+function closePixModal() {
+  const modal = document.getElementById('pix-modal');
+  if (modal) modal.style.display = 'none';
+  clearInterval(_pixTimerInt);
+  clearInterval(_pixPollInt);
+  _pixPaymentId = null;
+}
+
+function copyPixCode() {
+  const inp = document.getElementById('pix-code-inp');
+  if (!inp || !inp.value) return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(inp.value).then(() => toast('✅ Código PIX copiado!', 'good'));
+  } else {
+    inp.select();
+    document.execCommand('copy');
+    toast('✅ Código PIX copiado!', 'good');
+  }
+}
+
+// SSE handler for purchase confirmation
+function registerShopSSEHandlers() {
+  if (!sseConn) return;
+  sseConn.addEventListener('purchase_confirmed', e => {
+    const d = JSON.parse(e.data);
+    const r = d.rewards;
+    let summary = [];
+    if (r.gold)         summary.push('+' + r.gold.toLocaleString() + ' ouro');
+    if (r.vipDays)      summary.push('VIP ' + r.vipDays + ' dias');
+    if (r.items)        summary.push(r.items + ' item(s) épico(s)');
+    if (r.consumables)  summary.push(r.consumables + ' pedra(s)');
+
+    // Update PIX modal status if open
+    const statusEl = document.getElementById('pix-status');
+    if (statusEl) statusEl.innerHTML = '✅ <b style="color:var(--green-light)">Pagamento confirmado!</b><br><small>' + summary.join(' · ') + '</small>';
+
+    toast('💎 Compra confirmada! ' + summary.join(', '), 'good');
+    addLog('💎 Compra: ' + d.productName + ' — ' + summary.join(', '), 'good');
+
+    // Reload state
+    api('GET', '/api/load').then(lr => {
+      if (lr.gameState) { G = lr.gameState; updateUI(); updateVipBanner(); }
+    });
   });
 }
 
