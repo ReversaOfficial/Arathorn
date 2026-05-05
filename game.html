@@ -97,7 +97,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 .btn-create:hover{opacity:.9}
 
 /* ── GAME SCREEN ── */
-#screen-game{flex-direction:column}
+#screen-game{flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
 .topbar{flex-shrink:0;height:52px;background:var(--bg-dark);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;position:relative;z-index:10}
 .topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold-dark),transparent)}
 .topbar-logo{font-family:'Cinzel',serif;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:2px;white-space:nowrap;margin-right:4px}
@@ -415,85 +415,98 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
   .save-status { display: none; }
   .topbar-right { gap: 6px; }
 
-  /* ── MAIN LAYOUT: stack sidebar on bottom ── */
+  /* ── MAIN LAYOUT: full height with fixed bottom nav ── */
   .main-area {
     grid-template-columns: 1fr !important;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 1fr !important;
     overflow: hidden;
+    position: relative;
   }
 
-  /* Hide right panel on mobile — stats visible in profile page */
+  /* Hide right panel on mobile */
   .right-panel { display: none !important; }
 
-  /* Sidebar becomes bottom nav bar */
+  /* Sidebar: fixed bottom nav bar */
   .sidenav {
-    grid-row: 2;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    height: 62px !important;
     display: flex !important;
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 4px 4px;
-    height: 58px;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 4px 4px !important;
+    padding-bottom: max(4px, env(safe-area-inset-bottom)) !important;
     border-right: none !important;
-    border-top: 1px solid var(--border);
-    background: var(--bg-dark);
+    border-top: 1px solid var(--border-light) !important;
+    background: var(--bg-dark) !important;
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x mandatory;
     gap: 2px;
     align-items: center;
     flex-shrink: 0;
+    z-index: 100;
   }
 
   /* Hide section labels in bottom nav */
   .nav-section-label { display: none !important; }
 
-  /* Nav items become icon-only tiles */
+  /* Nav items — icon + label tiles */
   .nav-item {
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 4px 8px;
-    min-width: 54px;
-    height: 50px;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 1px !important;
+    padding: 4px 6px !important;
+    min-width: 52px !important;
+    height: 54px !important;
     border-left: none !important;
-    border-bottom: 2px solid transparent;
-    font-size: 10px;
+    border-bottom: 2px solid transparent !important;
+    font-size: 9px !important;
+    line-height: 1.2 !important;
     white-space: nowrap;
     scroll-snap-align: start;
-    border-radius: var(--radius);
-    flex-shrink: 0;
-    text-align: center;
+    border-radius: 6px !important;
+    flex-shrink: 0 !important;
+    text-align: center !important;
+    position: relative;
   }
   .nav-item.active {
     border-bottom-color: var(--gold) !important;
-    background: var(--bg-light);
+    background: var(--bg-light) !important;
+    color: var(--gold) !important;
   }
   .nav-icon {
-    font-size: 18px;
-    width: auto;
-    display: block;
+    font-size: 20px !important;
+    width: auto !important;
+    display: block !important;
+    line-height: 1 !important;
+    margin-bottom: 1px !important;
   }
   .nav-badge {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    font-size: 8px;
-    padding: 0 3px;
-    min-width: 14px;
-    height: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: absolute !important;
+    top: 2px !important;
+    right: 2px !important;
+    font-size: 8px !important;
+    padding: 0 3px !important;
+    min-width: 14px !important;
+    height: 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 7px !important;
   }
-  .nav-item { position: relative; }
 
-  /* Content area full width */
+  /* Content area full width — with bottom padding for fixed nav */
   .content-area {
-    grid-row: 1;
-    padding: 12px 10px;
-    overflow-y: auto;
+    padding: 12px 10px 80px 10px !important;
+    overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
+    height: 100% !important;
   }
 
   /* ── GRIDS — single column on mobile ── */
@@ -581,14 +594,15 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
   .bar-wrap { height: 10px; }
   .bar-label { font-size: 11px; }
 
-  /* ── TOAST ── */
+  /* ── TOAST — above bottom nav ── */
   #toast-container {
-    bottom: 70px !important; /* above bottom nav */
+    bottom: 72px !important;
     right: 8px !important;
     left: 8px !important;
-    max-width: 100% !important;
+    max-width: calc(100% - 16px) !important;
+    width: calc(100% - 16px) !important;
   }
-  .toast { font-size: 13px; padding: 10px 14px; }
+  .toast { font-size: 13px !important; padding: 10px 14px !important; width: 100% !important; }
 
   /* ── HUD bars — compact on mobile ── */
   #hud-hp, #hud-mana, #hud-stam {
@@ -655,20 +669,14 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
   .modal-box { margin-top: 10px; margin-bottom: 10px; }
   /* Combat screen on mobile */
   .combat-box { width: 100%; max-width: 100%; }
-  .combat-screen.open { display: flex; }
+  .combat-screen.open { display: flex !important; }
+  /* Fix main area to fill screen minus topbar */
+  .main-area { height: calc(100vh - 52px); height: calc(100dvh - 52px); }
   /* Prevent body scroll when modal open */
   body.modal-open { overflow: hidden; }
   /* Fix profile char header on tiny screens */
   .char-header { flex-direction: column; align-items: center; text-align: center; }
-  /* Nav item text - shorten long labels */
-  .nav-item span:not(.nav-icon):not(.nav-badge) {
-    font-size: 9px;
-    max-width: 52px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: block;
-  }
+
   /* Ensure equip slot grid shows 3 cols */
   #equip-slots-grid {
     grid-template-columns: repeat(3, 1fr) !important;
@@ -680,6 +688,29 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
   input, select, textarea { font-size: 16px !important; } /* prevent iOS zoom */
   /* Bottom safe area for notch phones */
   .sidenav { padding-bottom: max(4px, env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 768px) {
+  /* Show short label from data attribute */
+  .nav-item::after {
+    content: attr(data-label);
+    font-size: 9px;
+    color: inherit;
+    display: block;
+    text-align: center;
+    line-height: 1;
+    max-width: 52px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Hide the original text nodes (keep icon span visible) */
+  .nav-item > *:not(.nav-icon):not(.nav-badge) {
+    display: none !important;
+  }
+  .nav-icon {
+    display: block !important;
+  }
 }
 
 </style>
@@ -852,24 +883,24 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
     <nav class="sidenav">
       <div class="nav-section-label">Personagem</div>
       <div class="nav-item active" data-page="perfil" onclick="navTo(this)"><span class="nav-icon">👤</span> Perfil</div>
-      <div class="nav-item" data-page="inventario" onclick="navTo(this)"><span class="nav-icon">🎒</span> Inventário</div>
-      <div class="nav-item" data-page="conquistas" onclick="navTo(this)"><span class="nav-icon">🏅</span> Conquistas</div>
+      <div class="nav-item" data-page="inventario" data-label="Inv." onclick="navTo(this)"><span class="nav-icon">🎒</span> Inventário</div>
+      <div class="nav-item" data-page="conquistas" data-label="Conquistas" onclick="navTo(this)"><span class="nav-icon">🏅</span> Conquistas</div>
       <div class="nav-section-label">Mundo</div>
-      <div class="nav-item" data-page="mapa" onclick="navTo(this)"><span class="nav-icon">🗺️</span> Mapa</div>
-      <div class="nav-item" data-page="missoes" onclick="navTo(this)"><span class="nav-icon">⚔️</span> Missões</div>
+      <div class="nav-item" data-page="mapa" data-label="Mapa" onclick="navTo(this)"><span class="nav-icon">🗺️</span> Mapa</div>
+      <div class="nav-item" data-page="missoes" data-label="Missões" onclick="navTo(this)"><span class="nav-icon">⚔️</span> Missões</div>
       <div class="nav-section-label">Serviços</div>
-      <div class="nav-item" data-page="taverna" onclick="navTo(this)"><span class="nav-icon">🍺</span> Taverna</div>
-      <div class="nav-item" data-page="loja" onclick="navTo(this)"><span class="nav-icon">⚒️</span> Ferreiro</div>
-      <div class="nav-item" data-page="alquimia" onclick="navTo(this)"><span class="nav-icon">🧪</span> Alquimista</div>
-      <div class="nav-item" data-page="fornalha" onclick="navTo(this)"><span class="nav-icon">🔥</span> Fornalha Mestra</div>
+      <div class="nav-item" data-page="taverna" data-label="Taverna" onclick="navTo(this)"><span class="nav-icon">🍺</span> Taverna</div>
+      <div class="nav-item" data-page="loja" data-label="Loja" onclick="navTo(this)"><span class="nav-icon">⚒️</span> Ferreiro</div>
+      <div class="nav-item" data-page="alquimia" data-label="Alquimia" onclick="navTo(this)"><span class="nav-icon">🧪</span> Alquimista</div>
+      <div class="nav-item" data-page="fornalha" data-label="Fornalha" onclick="navTo(this)"><span class="nav-icon">🔥</span> Fornalha Mestra</div>
       <div class="nav-section-label">Social</div>
-      <div class="nav-item" data-page="amigos" onclick="navTo(this)"><span class="nav-icon">👥</span> Amigos <span class="nav-badge" id="friend-req-badge" style="display:none">!</span></div>
-      <div class="nav-item" data-page="party" onclick="navTo(this)"><span class="nav-icon">🤝</span> Party <span class="nav-badge" id="party-badge" style="display:none">!</span></div>
-      <div class="nav-item" data-page="chat" onclick="navTo(this)"><span class="nav-icon">💬</span> Chat <span class="nav-badge" id="chat-unread-badge" style="display:none">0</span></div>
-      <div class="nav-item" data-page="arena" onclick="navTo(this)"><span class="nav-icon">⚔️</span> Arena PvP <span class="nav-badge" id="duel-notif" style="display:none">!</span></div>
-      <div class="nav-item" data-page="clan" onclick="navTo(this)"><span class="nav-icon">🛡️</span> Clã</div>
-      <div class="nav-item" data-page="ranking" onclick="navTo(this)"><span class="nav-icon">🏆</span> Ranking</div>
-      <div class="nav-item" data-page="enviar" onclick="navTo(this)"><span class="nav-icon">💸</span> Enviar Ouro</div>
+      <div class="nav-item" data-page="amigos" data-label="Amigos" onclick="navTo(this)"><span class="nav-icon">👥</span> Amigos <span class="nav-badge" id="friend-req-badge" style="display:none">!</span></div>
+      <div class="nav-item" data-page="party" data-label="Party" onclick="navTo(this)"><span class="nav-icon">🤝</span> Party <span class="nav-badge" id="party-badge" style="display:none">!</span></div>
+      <div class="nav-item" data-page="chat" data-label="Chat" onclick="navTo(this)"><span class="nav-icon">💬</span> Chat <span class="nav-badge" id="chat-unread-badge" style="display:none">0</span></div>
+      <div class="nav-item" data-page="arena" data-label="Arena" onclick="navTo(this)"><span class="nav-icon">⚔️</span> Arena PvP <span class="nav-badge" id="duel-notif" style="display:none">!</span></div>
+      <div class="nav-item" data-page="clan" data-label="Clã" onclick="navTo(this)"><span class="nav-icon">🛡️</span> Clã</div>
+      <div class="nav-item" data-page="ranking" data-label="Top" onclick="navTo(this)"><span class="nav-icon">🏆</span> Ranking</div>
+      <div class="nav-item" data-page="enviar" data-label="Ouro" onclick="navTo(this)"><span class="nav-icon">💸</span> Enviar Ouro</div>
     </nav>
 
     <!-- CONTENT -->
