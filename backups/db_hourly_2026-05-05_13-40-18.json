@@ -1,0 +1,314 @@
+{
+  "users": {
+    "k10": {
+      "username": "K10",
+      "password": "93db109ff8d5a0329c370cc010eba5ea:13e6fc47815b0c5133c12c9d3c7444e9269b25eb6668e9486b1a3e8e0ad2cfce",
+      "createdAt": 1777992216843,
+      "lastLogin": 1777992216843,
+      "gameState": {
+        "name": "Hannah",
+        "race": "mago",
+        "level": 3,
+        "xp": 394,
+        "xpNext": 2180,
+        "hp": 92,
+        "hpMax": 92,
+        "mana": 172,
+        "manaMax": 172,
+        "stam": 11,
+        "stamMax": 12,
+        "gold": 726,
+        "str": 6,
+        "dex": 16,
+        "mag": 27,
+        "res": 10,
+        "xpBonus": 0,
+        "equipment": {
+          "weapon": "mw1",
+          "helmet": "mh1",
+          "armor": "ma1",
+          "pants": "mp1",
+          "gloves": "mg1",
+          "boots": "mb1",
+          "shield": "sh_m1",
+          "ring": "rm2",
+          "earring": null
+        },
+        "inventory": [
+          "sh_m1",
+          "ma1",
+          "rm2",
+          "mp1",
+          "mh1",
+          "mw1",
+          "mb1",
+          "mg1",
+          "mp1",
+          "mh1",
+          "sh_m1",
+          "eh1",
+          "sh_m2"
+        ],
+        "consumables": [],
+        "buffs": [],
+        "clanName": "Metah",
+        "clanTag": "MTH",
+        "clanRole": "leader",
+        "clanWins": 0,
+        "clanGold": 0,
+        "clanFounded": 1777992860419,
+        "clanMembers": [],
+        "currentZone": "mirkwood",
+        "stats": {
+          "missions": 61,
+          "kills": 61,
+          "crimes": 0,
+          "pvpWins": 0,
+          "pvpLosses": 0,
+          "warWins": 0,
+          "warLosses": 0
+        },
+        "achievements": [
+          "first_mission",
+          "buy_item",
+          "kill_10",
+          "clan_join",
+          "rich_500",
+          "missions_50"
+        ],
+        "log": [
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "🍺 Erva de Athelas — +20 HP",
+            "cls": "info"
+          },
+          {
+            "msg": "🍺 Erva de Athelas — +20 HP",
+            "cls": "info"
+          },
+          {
+            "msg": "🍺 Curativo Élfico — +50 HP",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +38🪙 +20XP ⚠️ HP baixo (16/92)!",
+            "cls": "good"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +35🪙 +19XP ⚠️ HP baixo (25/92)!",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +21🪙 +19XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +37🪙 +18XP",
+            "cls": "good"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +25🪙 +18XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +39🪙 +25XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +34🪙 +18XP 🎁",
+            "cls": "good"
+          },
+          {
+            "msg": "🎁 Drop: Orbe Defensivo [Excelente]",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +35🪙 +25XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +16🪙 +16XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +18🪙 +17XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +37🪙 +17XP",
+            "cls": "good"
+          },
+          {
+            "msg": "🍺 Erva de Athelas — +20 HP",
+            "cls": "info"
+          },
+          {
+            "msg": "🍺 Banquete Real — +50 HP, +10 estamina",
+            "cls": "info"
+          },
+          {
+            "msg": "🏅 Conquista: Veterano",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +34🪙 +15XP ⚠️ HP baixo (21/92)!",
+            "cls": "good"
+          },
+          {
+            "msg": "🏅 Conquista: Homem de Posses",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +23🪙 +15XP 🎁",
+            "cls": "good"
+          },
+          {
+            "msg": "🎁 Drop: Elmo Set da Floresta [Normal]",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +35🪙 +13XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +24🪙 +25XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +35🪙 +22XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +18🪙 +13XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +32🪙 +16XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +33🪙 +21XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +21🪙 +18XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +17🪙 +23XP 🎁",
+            "cls": "good"
+          },
+          {
+            "msg": "🎁 Drop: Livro Protetor [Normal]",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +35🪙 +18XP",
+            "cls": "good"
+          },
+          {
+            "msg": "🎉 NÍVEL 3! STR+0 DEX+1 MAG+4 RES+1",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Ninho das Aranhas Negras\" — +27🪙 +24XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +34🪙 +13XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +30🪙 +22XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +29🪙 +13XP",
+            "cls": "good"
+          },
+          {
+            "msg": "🍺 Banquete Real — +50 HP, +10 estamina",
+            "cls": "info"
+          },
+          {
+            "msg": "🍺 Erva de Athelas — +20 HP",
+            "cls": "info"
+          },
+          {
+            "msg": "🍺 Erva de Athelas — +20 HP",
+            "cls": "info"
+          }
+        ],
+        "jailUntil": 0,
+        "profilePrivate": false,
+        "forge": {
+          "attempts": 0,
+          "batch": []
+        },
+        "knockedOutUntil": 0,
+        "friends": [],
+        "created": 1777992249345
+      },
+      "savedAt": 1777998658241
+    }
+  },
+  "duels": [],
+  "clanWars": [],
+  "globalStats": {
+    "totalMissions": 61,
+    "pristMilestone": 0,
+    "ravikaMilestone": 0
+  },
+  "chatRooms": {
+    "global_reino": {
+      "id": "global_reino",
+      "type": "global",
+      "name": "Chat do Reino",
+      "members": [],
+      "messages": [],
+      "readAt": {
+        "k10": 1777992833472
+      },
+      "createdAt": 1777992821475
+    }
+  }
+}

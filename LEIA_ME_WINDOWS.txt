@@ -1,0 +1,102 @@
+═══════════════════════════════════════════════════════
+  TERRAS DE ARATHORN — Guia de Instalação Windows
+═══════════════════════════════════════════════════════
+
+PASSO 1 — INSTALAR NODE.JS
+─────────────────────────────
+  1. Acesse: https://nodejs.org/en/download
+  2. Clique em "LTS" (versão recomendada)
+  3. Baixe o instalador .msi para Windows
+  4. Execute e instale normalmente (Next > Next > Install)
+  5. Reinicie o computador após instalar
+
+  ⚠ Se já tem Node.js instalado, pule para o Passo 2.
+
+PASSO 2 — ORGANIZAR ARQUIVOS
+──────────────────────────────
+  Coloque todos estes arquivos na MESMA pasta:
+  
+    📄 server.js
+    📄 game.html
+    📄 iniciar_windows.bat
+    📄 instalar_windows.bat
+
+  Sugestão de pasta: C:\Arathorn\
+
+PASSO 3 — INSTALAR
+──────────────────────────────
+  Clique duas vezes em:
+    ▶ instalar_windows.bat
+  
+  Ele vai verificar tudo e criar a pasta de backups.
+
+PASSO 4 — INICIAR O JOGO
+──────────────────────────────
+  Clique duas vezes em:
+    ▶ iniciar_windows.bat
+
+  Uma janela preta vai abrir com o servidor rodando.
+  NÃO FECHE essa janela — ela é o servidor!
+
+PASSO 5 — JOGAR
+──────────────────────────────
+  Abra o navegador (Chrome, Edge, Firefox) e acesse:
+    🌐 http://localhost:3000
+
+  Para outros computadores na sua rede WiFi acessarem:
+    🌐 http://SEU_IP_LOCAL:3000
+  
+  (Para descobrir seu IP local: abra o Prompt de Comando
+   e digite: ipconfig  — procure "Endereço IPv4")
+
+═══════════════════════════════════════════════════════
+  BACKUPS AUTOMÁTICOS
+═══════════════════════════════════════════════════════
+  
+  Os dados dos jogadores ficam em: db.json
+  Backups automáticos ficam em: backups\
+  
+  - Todo dia à meia-noite: backup diário (últimos 30 dias)
+  - A cada hora: backup de emergência (últimas 7 horas)
+  - Ao fechar o servidor: backup de shutdown
+
+  Para restaurar um backup:
+    1. Pare o servidor (feche a janela preta)
+    2. Copie o arquivo desejado de backups\
+    3. Cole na pasta do jogo e renomeie para db.json
+    4. Inicie o servidor novamente
+
+═══════════════════════════════════════════════════════
+  PROBLEMAS COMUNS
+═══════════════════════════════════════════════════════
+
+  ❌ "node não é reconhecido"
+     → Node.js não foi instalado corretamente
+     → Reinstale o Node.js e reinicie o PC
+
+  ❌ "Porta 3000 já está em uso"
+     → Outro programa está usando a porta 3000
+     → Feche o outro programa, ou edite PORT no server.js
+
+  ❌ Janela do servidor fecha sozinha
+     → Algum erro no server.js
+     → Abra o Prompt de Comando (cmd) manualmente,
+       navegue até a pasta e rode: node server.js
+       para ver o erro
+
+  ❌ Firewall bloqueando outros jogadores
+     → Permita o Node.js no Firewall do Windows Defender
+     → Painel de Controle → Firewall → Permitir app
+
+═══════════════════════════════════════════════════════
+  ANTES DE ABRIR PARA TODOS JOGAREM
+═══════════════════════════════════════════════════════
+
+  🔒 IMPORTANTE: Edite a linha SECRET no server.js:
+  
+     const SECRET = 'arathorn_secret_key_2024_change_in_production';
+  
+  Troque por uma string aleatória de 40+ caracteres.
+  Ex: 'x7k2mPq9wNjL4rBdHcYvA3uTeS8oF1gIZ6nVpWmK'
+
+═══════════════════════════════════════════════════════

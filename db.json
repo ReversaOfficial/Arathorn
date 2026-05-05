@@ -1,0 +1,317 @@
+{
+  "users": {
+    "k10": {
+      "username": "K10",
+      "password": "93db109ff8d5a0329c370cc010eba5ea:13e6fc47815b0c5133c12c9d3c7444e9269b25eb6668e9486b1a3e8e0ad2cfce",
+      "createdAt": 1777992216843,
+      "lastLogin": 1777992216843,
+      "gameState": {
+        "name": "Hannah",
+        "race": "mago",
+        "level": 3,
+        "xp": 529,
+        "xpNext": 2180,
+        "hp": 92,
+        "hpMax": 92,
+        "mana": 172,
+        "manaMax": 172,
+        "stam": 12,
+        "stamMax": 12,
+        "gold": 364,
+        "str": 6,
+        "dex": 8,
+        "mag": 27,
+        "res": 5,
+        "xpBonus": 0,
+        "equipment": {
+          "weapon": "mw1",
+          "helmet": "mh1",
+          "armor": "ma1",
+          "pants": "mp1",
+          "gloves": "mg1",
+          "boots": "mb1",
+          "shield": "sh_m2",
+          "ring": "rm2+1",
+          "earring": null
+        },
+        "inventory": [
+          "ma1",
+          "rm2+1",
+          "mp1",
+          "mh1",
+          "mw1",
+          "mb1",
+          "mg1",
+          "mp1",
+          "mh1",
+          "sh_m2",
+          "mb1",
+          "ma1"
+        ],
+        "consumables": [
+          "p4"
+        ],
+        "buffs": [],
+        "clanName": "Metah",
+        "clanTag": "MTH",
+        "clanRole": "leader",
+        "clanWins": 0,
+        "clanGold": 0,
+        "clanFounded": 1777992860419,
+        "clanMembers": [],
+        "currentZone": "mirkwood",
+        "stats": {
+          "missions": 67,
+          "kills": 67,
+          "crimes": 0,
+          "pvpWins": 0,
+          "pvpLosses": 0,
+          "warWins": 0,
+          "warLosses": 0
+        },
+        "achievements": [
+          "first_mission",
+          "buy_item",
+          "kill_10",
+          "clan_join",
+          "rich_500",
+          "missions_50"
+        ],
+        "log": [
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "🔥 SUCESSO! Anel do Feiticeiro evoluído para +1!",
+            "cls": "good"
+          },
+          {
+            "msg": "💰 Vendeu Anel de Ferro Anão por ⬡ 30 ouro",
+            "cls": "good"
+          },
+          {
+            "msg": "💰 Vendeu Livro Protetor por ⬡ 23 ouro",
+            "cls": "good"
+          },
+          {
+            "msg": "💰 Vendeu Elmo Set da Floresta por ⬡ 18 ouro",
+            "cls": "good"
+          },
+          {
+            "msg": "💰 Vendeu Livro Protetor por ⬡ 23 ouro",
+            "cls": "good"
+          },
+          {
+            "msg": "⚔ Equipou: Orbe Defensivo",
+            "cls": "good"
+          },
+          {
+            "msg": "💎 Comprou: Pedra Prist",
+            "cls": "info"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "🧪 Comprou: Elixir de Batalha",
+            "cls": "info"
+          },
+          {
+            "msg": "🍺 Bálsamo da Floresta — HP restaurado!",
+            "cls": "info"
+          },
+          {
+            "msg": "💀 Derrota em \"Ninho das Aranhas Negras\" — HP zerou. | Perdeu: RES -5, DEX -8",
+            "cls": "bad"
+          },
+          {
+            "msg": "✅ \"Ninho das Aranhas Negras\" — +47🪙 +26XP 🎁 ⚠️ HP baixo (17/92)!",
+            "cls": "good"
+          },
+          {
+            "msg": "🎁 Drop: Anel de Ferro Anão [Normal]",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Ninho das Aranhas Negras\" — +36🪙 +21XP 🎁",
+            "cls": "good"
+          },
+          {
+            "msg": "🎁 Drop: Armadura Set do Aprendiz [Normal]",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +22🪙 +17XP 🎁",
+            "cls": "good"
+          },
+          {
+            "msg": "🎁 Drop: Botas Set do Aprendiz [Normal]",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +23🪙 +22XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +37🪙 +25XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Ninho das Aranhas Negras\" — +20🪙 +24XP",
+            "cls": "good"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "🍺 Erva de Athelas — +20 HP",
+            "cls": "info"
+          },
+          {
+            "msg": "🍺 Erva de Athelas — +20 HP",
+            "cls": "info"
+          },
+          {
+            "msg": "🍺 Curativo Élfico — +50 HP",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +38🪙 +20XP ⚠️ HP baixo (16/92)!",
+            "cls": "good"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +35🪙 +19XP ⚠️ HP baixo (25/92)!",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +21🪙 +19XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +37🪙 +18XP",
+            "cls": "good"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "⏰ +1 estamina (regeneração)",
+            "cls": "muted"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +25🪙 +18XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +39🪙 +25XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +34🪙 +18XP 🎁",
+            "cls": "good"
+          },
+          {
+            "msg": "🎁 Drop: Orbe Defensivo [Excelente]",
+            "cls": "info"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +35🪙 +25XP",
+            "cls": "good"
+          },
+          {
+            "msg": "✅ \"Caça aos Lobos de Mirkwood\" — +16🪙 +16XP",
+            "cls": "good"
+          }
+        ],
+        "jailUntil": 0,
+        "profilePrivate": false,
+        "forge": {
+          "attempts": 1,
+          "batch": [
+            "rm2"
+          ]
+        },
+        "knockedOutUntil": 0,
+        "friends": [],
+        "created": 1777992249345
+      },
+      "savedAt": 1778002190668
+    }
+  },
+  "duels": [],
+  "clanWars": [],
+  "globalStats": {
+    "totalMissions": 67,
+    "pristMilestone": 0,
+    "ravikaMilestone": 0
+  },
+  "chatRooms": {
+    "global_reino": {
+      "id": "global_reino",
+      "type": "global",
+      "name": "Chat do Reino",
+      "members": [],
+      "messages": [],
+      "readAt": {
+        "k10": 1777992833472
+      },
+      "createdAt": 1777992821475
+    }
+  }
+}
