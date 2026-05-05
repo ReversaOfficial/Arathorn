@@ -2,7 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0806">
 <title>Terras de Arathorn</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 <style>
@@ -19,7 +23,7 @@
   --radius:4px;--radius-lg:8px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden}@media(max-width:768px){html,body{height:100%;overflow:hidden;position:fixed;width:100%}}
 body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var(--text-primary);font-size:15px;line-height:1.5}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--bg-dark)}
@@ -115,7 +119,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 .main-area{flex:1;display:grid;grid-template-columns:185px 1fr 195px;overflow:hidden}
 .sidenav{background:var(--bg-dark);border-right:1px solid var(--border);overflow-y:auto;padding:8px 0}
 .nav-section-label{font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);padding:12px 14px 4px}
-.nav-item{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;color:var(--text-secondary);font-size:13px;border-left:2px solid transparent;transition:all .15s;user-select:none}
+.nav-item{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;color:var(--text-secondary);font-size:13px;border-left:2px solid transparent;transition:all .15s;user-select:none;-webkit-tap-highlight-color:transparent}
 .nav-item:hover{background:var(--bg-mid);color:var(--text-primary)}
 .nav-item.active{background:var(--bg-light);color:var(--gold);border-left-color:var(--gold)}
 .nav-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0}
@@ -384,6 +388,300 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 .friend-info{font-size:11px;color:var(--text-muted)}
 .sell-price-tag{font-size:11px;color:var(--green-light);font-weight:600;margin:3px 0}
 .trade-selected{border-color:var(--gold)!important;background:rgba(201,168,76,.08)!important}
+
+/* ══════════════════════════════════════════════════════
+   RESPONSIVO — MOBILE FIRST
+   Breakpoints: 
+     < 768px  = mobile (phone)
+     768-1024 = tablet
+   ══════════════════════════════════════════════════════ */
+
+/* ── TOPBAR MOBILE ── */
+@media (max-width: 768px) {
+  .topbar {
+    height: auto;
+    min-height: 52px;
+    padding: 6px 10px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .topbar-logo { font-size: 11px; letter-spacing: 1px; }
+  .hud-bar-wrap { min-width: 80px; padding: 3px 7px; }
+  .hud-bar-label { font-size: 10px; }
+  .hud-mini-bar { height: 6px; }
+  /* Hide level/gold on tiny screens — visible in profile */
+  .hud-stat { display: none; }
+  .player-name-top { display: none; }
+  .save-status { display: none; }
+  .topbar-right { gap: 6px; }
+
+  /* ── MAIN LAYOUT: stack sidebar on bottom ── */
+  .main-area {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr auto;
+    overflow: hidden;
+  }
+
+  /* Hide right panel on mobile — stats visible in profile page */
+  .right-panel { display: none !important; }
+
+  /* Sidebar becomes bottom nav bar */
+  .sidenav {
+    grid-row: 2;
+    display: flex !important;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 4px;
+    height: 58px;
+    border-right: none !important;
+    border-top: 1px solid var(--border);
+    background: var(--bg-dark);
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    gap: 2px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  /* Hide section labels in bottom nav */
+  .nav-section-label { display: none !important; }
+
+  /* Nav items become icon-only tiles */
+  .nav-item {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 8px;
+    min-width: 54px;
+    height: 50px;
+    border-left: none !important;
+    border-bottom: 2px solid transparent;
+    font-size: 10px;
+    white-space: nowrap;
+    scroll-snap-align: start;
+    border-radius: var(--radius);
+    flex-shrink: 0;
+    text-align: center;
+  }
+  .nav-item.active {
+    border-bottom-color: var(--gold) !important;
+    background: var(--bg-light);
+  }
+  .nav-icon {
+    font-size: 18px;
+    width: auto;
+    display: block;
+  }
+  .nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 8px;
+    padding: 0 3px;
+    min-width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-item { position: relative; }
+
+  /* Content area full width */
+  .content-area {
+    grid-row: 1;
+    padding: 12px 10px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── GRIDS — single column on mobile ── */
+  .grid-2, .grid-3 { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+  .grid-1 { grid-template-columns: 1fr !important; }
+
+  /* ── CARDS ── */
+  .card { padding: 12px; margin-bottom: 10px; }
+  .card-title { font-size: 11px; }
+
+  /* ── PAGE TITLES ── */
+  .page-title { font-size: 18px; }
+  .page-sub { font-size: 12px; }
+
+  /* ── COMBAT SCREEN ── */
+  .combat-box { padding: 16px 12px; }
+  .combat-vs { gap: 10px; }
+  .combatant-icon { font-size: 40px; }
+  .combatant-name { font-size: 12px; }
+  .combatant-hp { font-size: 11px; }
+  .vs-text { font-size: 18px; }
+  #combat-log-box { max-height: 140px; font-size: 12px; }
+
+  /* ── SHOP ITEMS ── */
+  .shop-item { padding: 10px 8px; }
+  .shop-item-icon { font-size: 24px; }
+  .shop-item-name { font-size: 12px; }
+  .shop-item-stats { font-size: 11px; }
+  .shop-item-price { font-size: 12px; }
+
+  /* ── EQUIP SLOTS ── */
+  .equip-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 6px; }
+  .equip-slot { min-height: 70px !important; padding: 6px 4px !important; }
+  .equip-slot-label { font-size: 8px; }
+  .equip-slot-icon { font-size: 16px; }
+  .equip-slot-name { font-size: 9px; }
+
+  /* ── MEMBER ROWS ── */
+  .member-row { flex-wrap: wrap; gap: 6px; padding: 8px 0; }
+  .member-avatar { width: 28px; height: 28px; font-size: 14px; }
+
+  /* ── CHAT ── */
+  #page-chat > div[style*="grid-template-columns"] {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    gap: 8px;
+  }
+  #chat-room-list { max-height: 180px; }
+  #chat-main { height: 400px; }
+
+  /* ── MODAL ── */
+  .modal-box { 
+    padding: 20px 16px;
+    max-width: 95vw !important;
+    margin: 10px;
+  }
+  .modal-title { font-size: 16px; }
+  .modal-body { font-size: 13px; }
+  .modal-actions { flex-direction: column; gap: 8px; }
+  .modal-actions .btn { width: 100%; text-align: center; }
+
+  /* ── BUTTONS ── */
+  .btn { padding: 8px 12px; font-size: 12px; }
+  .btn-full { width: 100%; }
+
+  /* ── TABS ── */
+  .tabs { gap: 2px; flex-wrap: wrap; }
+  .tab { font-size: 11px; padding: 7px 10px; }
+
+  /* ── CHAR HEADER ── */
+  .char-header { gap: 12px; }
+
+  /* ── STAT BOXES ── */
+  .stat-box { padding: 8px 5px; }
+
+  /* ── RANKING ── */
+  .rank-row { font-size: 12px; }
+  .rank-row > * { padding: 6px 4px; }
+
+  /* ── MISSIONS ── */
+  .mission-card { padding: 10px; }
+
+  /* ── BARS ── */
+  .bar-wrap { height: 10px; }
+  .bar-label { font-size: 11px; }
+
+  /* ── TOAST ── */
+  #toast-container {
+    bottom: 70px !important; /* above bottom nav */
+    right: 8px !important;
+    left: 8px !important;
+    max-width: 100% !important;
+  }
+  .toast { font-size: 13px; padding: 10px 14px; }
+
+  /* ── HUD bars — compact on mobile ── */
+  #hud-hp, #hud-mana, #hud-stam {
+    min-width: 65px !important;
+  }
+
+  /* ── Auth screen ── */
+  .auth-logo-title { font-size: 28px; letter-spacing: 2px; }
+  .auth-box { padding: 24px 18px; }
+  .create-box { padding: 20px 14px; }
+  .race-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .race-card { padding: 8px; }
+  .race-icon { font-size: 18px; }
+  .race-name { font-size: 11px; }
+
+  /* ── Party / Trade / Clan — stack grids ── */
+  .grid-2 > * { min-width: 0; }
+  #trade-room .grid-2,
+  #page-clan .grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Right panel stat boxes in 2 cols only ── */
+  #page-perfil .grid-3-stats {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* ── Forge ── */
+  .forge-grid { grid-template-columns: 1fr !important; }
+
+  /* ── Map page ── */
+  .map-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* ── Zone card ── */
+  .zone-card { padding: 12px 10px; }
+
+  /* ── Infirmary banner ── */
+  #tav-infirmary-banner { padding: 12px; font-size: 13px; }
+
+  /* ── Scrollbar hide on mobile ── */
+  .sidenav::-webkit-scrollbar { display: none; }
+}
+
+/* ── TABLET ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .main-area { grid-template-columns: 160px 1fr 0 !important; }
+  .right-panel { display: none !important; }
+  .content-area { padding: 16px; }
+  .grid-3 { grid-template-columns: 1fr 1fr !important; }
+}
+
+/* ── VERY SMALL PHONES (< 380px) ── */
+@media (max-width: 380px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr !important; }
+  .nav-item { min-width: 46px; padding: 4px 6px; font-size: 9px; }
+  .nav-icon { font-size: 16px; }
+  .topbar-logo { font-size: 10px; }
+  .hud-bar-wrap { min-width: 65px; padding: 3px 5px; }
+  .combat-box { padding: 12px 8px; }
+}
+
+@media (max-width: 768px) {
+  #hud-gold-wrap, #hud-level-wrap { display: none !important; }
+  .modal-box { margin-top: 10px; margin-bottom: 10px; }
+  /* Combat screen on mobile */
+  .combat-box { width: 100%; max-width: 100%; }
+  .combat-screen.open { display: flex; }
+  /* Prevent body scroll when modal open */
+  body.modal-open { overflow: hidden; }
+  /* Fix profile char header on tiny screens */
+  .char-header { flex-direction: column; align-items: center; text-align: center; }
+  /* Nav item text - shorten long labels */
+  .nav-item span:not(.nav-icon):not(.nav-badge) {
+    font-size: 9px;
+    max-width: 52px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+  }
+  /* Ensure equip slot grid shows 3 cols */
+  #equip-slots-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 5px !important;
+  }
+  /* Better touch targets */
+  .btn { min-height: 38px; }
+  .btn-sm { min-height: 32px; }
+  input, select, textarea { font-size: 16px !important; } /* prevent iOS zoom */
+  /* Bottom safe area for notch phones */
+  .sidenav { padding-bottom: max(4px, env(safe-area-inset-bottom)); }
+}
+
 </style>
 </head>
 <body>
