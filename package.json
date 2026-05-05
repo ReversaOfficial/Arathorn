@@ -1,0 +1,12 @@
+{
+  "name": "terras-de-arathorn",
+  "version": "1.0.0",
+  "description": "Terras de Arathorn - RPG Medieval Browser-Based",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
