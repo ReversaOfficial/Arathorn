@@ -635,8 +635,12 @@ async function handleRequest(req, res) {
     const db = loadDB();
     const key = username.toLowerCase();
     if (db.users[key]) { send(res, 409, { error: 'Nome de usuario ja existe.' }); return; }
-    const safeEmail = typeof body.email === 'string' && body.email.includes('@') ? safeString(body.email, 100) : null;
-    db.users[key] = { username, password: hashPassword(password), email: safeEmail, createdAt: Date.now(), lastLogin: Date.now(), gameState: null };
+    const safeEmail    = typeof body.email    === 'string' && body.email.includes('@') ? safeString(body.email, 100) : null;
+    const sqQuestion   = typeof body.securityQuestion === 'string' ? safeString(body.securityQuestion, 20) : null;
+    // Store answer as lowercase hash for case-insensitive comparison
+    const sqAnswerRaw  = typeof body.securityAnswer   === 'string' ? body.securityAnswer.trim().toLowerCase() : null;
+    const sqAnswer     = sqAnswerRaw ? hashPassword(sqAnswerRaw) : null;
+    db.users[key] = { username, password: hashPassword(password), email: safeEmail, securityQuestion: sqQuestion, securityAnswer: sqAnswer, createdAt: Date.now(), lastLogin: Date.now(), gameState: null };
     saveDB(db);
     send(res, 201, { token: makeToken(key), username });
     return;
@@ -2491,555 +2495,43 @@ async function handleRequest(req, res) {
   // ═══════════════════════════════════════════════════════════════════════
 
   // ═══════════════════════════════════════════════════════════════════════
-  // RECUPERAÇÃO DE SENHA AUTOMÁTICA (via e-mail — Resend.com)
-  //
-  // Configuração:
-  //   1. Crie conta gratuita em resend.com (3.000 emails/mês grátis)
-  //   2. Gere uma API Key em: resend.com/api-keys
-  //   3. Adicione variável de ambiente no Railway:
-  //        RESEND_API_KEY = re_xxxxxxxxxxxxxxxxx
-  //        GAME_EMAIL_FROM = noreply@seudominio.com  (ou use onboarding@resend.dev para teste)
-  //        BASE_URL = https://seu-app.up.railway.app
+  // RECUPERAÇÃO DE SENHA — PERGUNTA SECRETA
   // ═══════════════════════════════════════════════════════════════════════
 
-  const RESEND_API_KEY  = process.env.RESEND_API_KEY || '';
-  const GAME_EMAIL_FROM = process.env.GAME_EMAIL_FROM || 'Terras de Arathorn <onboarding@resend.dev>';
-
-  async function sendRecoveryEmail(toEmail, username, code, expiresAt) {
-    if (!RESEND_API_KEY) {
-      console.warn('[EMAIL] RESEND_API_KEY não configurado — email não enviado.');
-      return false;
-    }
-    const expiryStr = new Date(expiresAt).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'});
-    const body = {
-      from: GAME_EMAIL_FROM,
-      to: [toEmail],
-      subject: '🔑 Recuperação de Senha — Terras de Arathorn',
-      html: `
-        <div style="font-family:Georgia,serif;background:#0a0806;color:#d4b483;padding:32px;max-width:480px;margin:0 auto;border-radius:8px">
-          <div style="text-align:center;margin-bottom:24px">
-            <div style="font-size:32px">⚔</div>
-            <div style="font-family:serif;font-size:22px;color:#c9a84c;letter-spacing:2px">TERRAS DE ARATHORN</div>
-          </div>
-          <p>Olá, <b>${username}</b>!</p>
-          <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
-          <p>Seu <b>código de recuperação</b> é:</p>
-          <div style="background:#1a1208;border:2px solid #c9a84c;border-radius:6px;padding:16px;text-align:center;margin:20px 0">
-            <span style="font-size:28px;font-family:monospace;color:#c9a84c;letter-spacing:8px">${code}</span>
-          </div>
-          <p style="font-size:13px;color:#999">Este código expira em: <b>${expiryStr}</b></p>
-          <p style="font-size:13px;color:#999">Se você não solicitou a recuperação, ignore este email. Sua senha permanece inalterada.</p>
-          <hr style="border-color:#333;margin:24px 0">
-          <p style="font-size:12px;color:#666;text-align:center">Terras de Arathorn — RPG Medieval</p>
-        </div>
-      `
-    };
-    try {
-      const r = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer '+RESEND_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const d = await r.json();
-      if (!r.ok) { console.error('[EMAIL] Resend error:', d); return false; }
-      console.log('[EMAIL] Email enviado para', toEmail, '— id:', d.id);
-      return true;
-    } catch(e) {
-      console.error('[EMAIL] Fetch error:', e.message);
-      return false;
-    }
-  }
-
-  // ── POST /api/recover/request — solicitar código por email ──────────────
-  if (method === 'POST' && url === '/api/recover/request') {
+  // POST /api/recover/question — return which question the user set (not the answer)
+  if (method === 'POST' && url === '/api/recover/question') {
     const body = await readBody(req);
     const username = safeString(body.username||'', 24).toLowerCase().trim();
     if (!username) { send(res,400,{error:'Informe o nome de usuário.'}); return; }
     const db = loadDB();
     const user = db.users[username];
-    // Always return success to prevent user enumeration
-    if (!user || !user.email) {
-      send(res,200,{ok:true, msg:'Se este usuário existir e tiver e-mail cadastrado, você receberá o código em breve.'});
-      return;
+    if (!user || !user.securityQuestion) {
+      send(res,200,{question:null}); return; // don't reveal if user exists
     }
-    // Rate limit: only 1 code per 5 minutes per user
-    if (!db.recoveryCodes) db.recoveryCodes = {};
-    const existing = db.recoveryCodes[username];
-    if (existing && (Date.now() - existing.createdAt) < 5*60*1000) {
-      send(res,429,{error:'Aguarde 5 minutos antes de solicitar outro código.'}); return;
-    }
-    // Generate code
-    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
-    const expiresAt = Date.now() + 30 * 60 * 1000; // 30 min
-    db.recoveryCodes[username] = { code, createdAt: Date.now(), expiresAt };
-    saveDB(db);
-    const sent = await sendRecoveryEmail(user.email, user.username || username, code, expiresAt);
-    if (!sent && !RESEND_API_KEY) {
-      // Dev mode: return code directly (REMOVE IN PRODUCTION)
-      console.log('[RECOVER DEV] Código para', username, ':', code);
-    }
-    send(res,200,{ok:true, msg:'Se este usuário existir e tiver e-mail cadastrado, você receberá o código em breve.'});
-    return;
+    send(res,200,{question: user.securityQuestion}); return;
   }
 
-  // ── POST /api/recover — confirmar código + trocar senha ─────────────────
+  // POST /api/recover — validate security answer + change password
   if (method === 'POST' && url === '/api/recover') {
     const body = await readBody(req);
-    const username    = safeString(body.username||'', 24).toLowerCase().trim();
-    const newPassword = typeof body.newPassword === 'string' ? body.newPassword : '';
-    const code        = safeString(body.code||'', 10).trim().toUpperCase();
-    if (!username||!newPassword||!code) { send(res,400,{error:'Preencha todos os campos.'}); return; }
+    const username       = safeString(body.username||'', 24).toLowerCase().trim();
+    const newPassword    = typeof body.newPassword    === 'string' ? body.newPassword    : '';
+    const securityAnswer = typeof body.securityAnswer === 'string' ? body.securityAnswer.trim().toLowerCase() : '';
+    if (!username||!newPassword||!securityAnswer) { send(res,400,{error:'Preencha todos os campos.'}); return; }
     if (newPassword.length < 6 || newPassword.length > 200) { send(res,400,{error:'Nova senha: 6-200 caracteres.'}); return; }
     const db = loadDB();
     const user = db.users[username];
-    if (!user) { send(res,400,{error:'Dados inválidos.'}); return; }
-    if (!db.recoveryCodes) db.recoveryCodes = {};
-    const rec = db.recoveryCodes[username];
-    if (!rec) { send(res,400,{error:'Nenhum código ativo. Solicite novamente.'}); return; }
-    if (Date.now() > rec.expiresAt) {
-      delete db.recoveryCodes[username]; saveDB(db);
-      send(res,400,{error:'Código expirado. Solicite um novo.'}); return;
+    if (!user) { send(res,400,{error:'Usuário não encontrado.'}); return; }
+    if (!user.securityQuestion || !user.securityAnswer) { send(res,400,{error:'Este usuário não possui pergunta secreta cadastrada.'}); return; }
+    // Verify answer (case-insensitive, trimmed)
+    if (!verifyPassword(securityAnswer, user.securityAnswer)) {
+      send(res,400,{error:'Resposta incorreta. Tente novamente.'}); return;
     }
-    if (rec.code !== code) { send(res,400,{error:'Código incorreto.'}); return; }
+    // Apply new password
     user.password = hashPassword(newPassword);
-    delete db.recoveryCodes[username];
     saveDB(db);
-    console.log('[RECOVER] Senha redefinida:', username);
+    console.log('[RECOVER] Senha redefinida via pergunta secreta:', username);
     send(res,200,{ok:true}); return;
-  }
-
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // CRIME SYSTEM — Global counter, every 11th crime gets caught
-  // ═══════════════════════════════════════════════════════════════════════
-  if (method === 'POST' && url === '/api/crime/commit') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
-    const g = user.gameState;
-
-    // Check if already in jail
-    if (g.jailUntil && g.jailUntil > Date.now()) {
-      send(res,400,{error:'Voce esta preso! Pague a fianca ou aguarde.'}); return;
-    }
-    // Check if KO
-    if (g.knockedOutUntil && g.knockedOutUntil > Date.now()) {
-      send(res,400,{error:'Voce esta na enfermaria!'}); return;
-    }
-
-    // Global crime counter
-    if (!db.globalStats) db.globalStats = { totalMissions:0, totalCrimes:0 };
-    if (!db.globalStats.totalCrimes) db.globalStats.totalCrimes = 0;
-    db.globalStats.totalCrimes++;
-    const crimeNum = db.globalStats.totalCrimes;
-
-    // Every 11th crime server-wide: this criminal gets caught!
-    const caughtByCounter = (crimeNum % 11 === 0);
-
-    saveDB(db);
-    send(res, 200, { ok: true, crimeNum, caughtByCounter });
-    return;
-  }
-
-  // Pay bail (gold)
-  if (method === 'POST' && url === '/api/crime/bail') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
-    const g = user.gameState;
-    if (!g.jailUntil || g.jailUntil <= Date.now()) { send(res,400,{error:'Voce nao esta preso.'}); return; }
-    const BAIL_COST = 10000;
-    if ((g.gold||0) < BAIL_COST) { send(res,400,{error:'Precisa de 10.000 ouro para pagar a fianca.'}); return; }
-    g.gold -= BAIL_COST;
-    g.jailUntil = 0;
-    if (!g.log) g.log=[];
-    g.log.unshift({msg:'⚖️ Pagou 10.000 ouro de fiança e saiu da cadeia!', cls:'info'});
-    saveDB(db);
-    send(res, 200, { ok:true, newBalance: g.gold });
-    return;
-  }
-
-
-  // Leader invites a specific player to clan from profile modal
-  if (method === 'POST' && url === '/api/clan/request-invite') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
-    const { targetUsername } = await readBody(req);
-    const target = (targetUsername||'').toLowerCase();
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user||!user.gameState||user.gameState.clanRole!=='leader') {
-      send(res,403,{error:'Apenas lideres podem convidar.'}); return;
-    }
-    const tUser = db.users[target];
-    if (!tUser||!tUser.gameState) { send(res,404,{error:'Jogador nao encontrado.'}); return; }
-    const clanName = user.gameState.clanName;
-    if (tUser.gameState.clanName === clanName) { send(res,409,{error:'Jogador ja e membro do cla.'}); return; }
-    if (!db.clanRequests) db.clanRequests = {};
-    if (!db.clanRequests[clanName]) db.clanRequests[clanName] = [];
-    // Check if already has pending request
-    if (db.clanRequests[clanName].find(r=>r.username===target)) {
-      send(res,409,{error:'Solicitacao ja existe para este jogador.'}); return;
-    }
-    // Add as a pre-approved invite (the target just needs to accept)
-    const g = tUser.gameState;
-    db.clanRequests[clanName].push({
-      username: target, name: g.name, race: g.race, level: g.level, ts: Date.now(), invited: true
-    });
-    saveDB(db);
-    // Notify target via SSE
-    sendSSE(target, 'clan_join_request', {
-      applicant: g.name, username: target, clanName,
-      fromLeader: user.gameState.name, isInvite: true
-    });
-    send(res,200,{ok:true});
-    return;
-  }
-
-
-  // Get current server assassin info
-  if (method === 'GET' && url === '/api/global/assassin') {
-    const db = loadDB();
-    const a = db.globalStats && db.globalStats.serverAssassin;
-    if (!a) { send(res, 200, { assassin: null }); return; }
-    const user = db.users[a.username];
-    const name = user && user.gameState ? user.gameState.name : a.username;
-    const race = user && user.gameState ? user.gameState.race : 'humano';
-    send(res, 200, { assassin: { username: a.username, name, kills: a.kills, race } });
-    return;
-  }
-
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // SISTEMA DE RAID — Clan raids 2~5 jogadores vs Boss
-  // Cooldown 2h por jogador por raid
-  // Drops divididos igualmente
-  // ═══════════════════════════════════════════════════════════════════════
-
-  const RAID_CATALOG = {
-    'raid_duo': {
-      id:'raid_duo', slots:2, minLv:10,
-      boss:{ name:'Trollano, o Devorador', icon:'👹', hp:8000, atk:180, desc:'Um troll ancião que habita as cavernas do Norte.' },
-      gold:[3000,6000], xp:[2500,5000], stam:3,
-      drops:['prist_s','prist_s','prist_s','ravika_s'],
-      bonusDrop:{ item:'r1', chance:0.30 }, // 30% chance of ring drop
-      cooldownMs: 2*60*60*1000
-    },
-    'raid_trio': {
-      id:'raid_trio', slots:3, minLv:30,
-      boss:{ name:'Vorgath, o Destruidor', icon:'🐲', hp:22000, atk:320, desc:'Dragão corrompido pelo Olho de Sauron.' },
-      gold:[12000,25000], xp:[10000,20000], stam:4,
-      drops:['prist_s','prist_m','ravika_s','ravika_s'],
-      bonusDrop:{ item:'re2', chance:0.25 },
-      cooldownMs: 2*60*60*1000
-    },
-    'raid_squad': {
-      id:'raid_squad', slots:4, minLv:60,
-      boss:{ name:'Molkrath, o Imortal', icon:'💀', hp:55000, atk:580, desc:'Lich Supremo que comanda legiões de mortos-vivos.' },
-      gold:[40000,80000], xp:[35000,65000], stam:5,
-      drops:['prist_m','prist_m','ravika_s','ravika_m'],
-      bonusDrop:{ item:'ran3', chance:0.20 },
-      cooldownMs: 2*60*60*1000
-    },
-    'raid_full': {
-      id:'raid_full', slots:5, minLv:100,
-      boss:{ name:'Zar\'oth, o Deus Proibido', icon:'🌑', hp:140000, atk:1200, desc:'Entidade primordial banida para além do véu da realidade.' },
-      gold:[120000,250000], xp:[100000,200000], stam:6,
-      drops:['ravika_m','ravika_m','prist_m','prist_m','prist_m'],
-      bonusDrop:{ item:'ew3_epc', chance:0.15 },
-      cooldownMs: 2*60*60*1000
-    },
-  };
-
-  // POST /api/raid/create — clan leader opens a raid room
-  if (method === 'POST' && url === '/api/raid/create') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
-    const { raidId } = await readBody(req);
-    const raid = RAID_CATALOG[raidId];
-    if (!raid) { send(res,400,{error:'Raid nao encontrada.'}); return; }
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
-    const g = user.gameState;
-    if (!g.clanName) { send(res,400,{error:'Precisa de um cla para abrir raids.'}); return; }
-    if (g.clanRole !== 'leader') { send(res,403,{error:'Apenas lideres de cla podem convocar raids.'}); return; }
-    if (g.level < raid.minLv) { send(res,400,{error:'Nivel '+raid.minLv+' necessario para esta raid.'}); return; }
-    // Check cooldown
-    const coolKey = username+'_'+raidId;
-    if (!db.raidCooldowns) db.raidCooldowns = {};
-    const lastRun = db.raidCooldowns[coolKey] || 0;
-    if (Date.now() - lastRun < raid.cooldownMs) {
-      const rem = Math.ceil((raid.cooldownMs - (Date.now()-lastRun)) / 60000);
-      send(res,429,{error:'Cooldown ativo. Disponivel em '+rem+' minutos.'}); return;
-    }
-    // Create raid room
-    if (!db.raidRooms) db.raidRooms = {};
-    const roomId = 'raid_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-    db.raidRooms[roomId] = {
-      id: roomId, raidId, clanName: g.clanName,
-      leader: username, leaderName: g.name,
-      members: [{ username, name: g.name, race: g.race, level: g.level }],
-      maxSlots: raid.slots, status: 'waiting',
-      createdAt: Date.now(), expiresAt: Date.now() + 10*60*1000 // 10min to fill
-    };
-    saveDB(db);
-    // Notify all online clan members
-    Object.entries(db.users).forEach(([u, d]) => {
-      if (u === username) return;
-      if (!d.gameState || d.gameState.clanName !== g.clanName) return;
-      if (!onlineMap.has(u)) return;
-      sendSSE(u, 'raid_invite', { roomId, raidId, leaderName: g.name, bossName: raid.boss.name, bossIcon: raid.boss.icon, slots: raid.slots, minLv: raid.minLv });
-    });
-    send(res,200,{ok:true, roomId, raid: { boss: raid.boss, slots: raid.slots, gold: raid.gold, xp: raid.xp }}); return;
-  }
-
-  // POST /api/raid/join — member joins raid room
-  if (method === 'POST' && url === '/api/raid/join') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
-    const { roomId } = await readBody(req);
-    const db = loadDB();
-    if (!db.raidRooms||!db.raidRooms[roomId]) { send(res,404,{error:'Sala de raid nao encontrada.'}); return; }
-    const room = db.raidRooms[roomId];
-    if (room.status !== 'waiting') { send(res,400,{error:'Esta raid ja iniciou ou encerrou.'}); return; }
-    if (room.expiresAt < Date.now()) { send(res,400,{error:'Convite expirado.'}); return; }
-    const user = db.users[username];
-    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
-    const g = user.gameState;
-    if (g.clanName !== room.clanName) { send(res,403,{error:'Voce nao pertence ao cla desta raid.'}); return; }
-    const raidDef = RAID_CATALOG[room.raidId];
-    if (g.level < raidDef.minLv) { send(res,400,{error:'Nivel '+raidDef.minLv+' necessario.'}); return; }
-    if (room.members.find(m=>m.username===username)) { send(res,409,{error:'Voce ja esta nesta raid.'}); return; }
-    if (room.members.length >= room.maxSlots) { send(res,400,{error:'Raid cheia ('+room.maxSlots+' jogadores max).'}); return; }
-    // Check cooldown
-    if (!db.raidCooldowns) db.raidCooldowns = {};
-    const coolKey = username+'_'+room.raidId;
-    const lastRun = db.raidCooldowns[coolKey] || 0;
-    if (Date.now() - lastRun < raidDef.cooldownMs) {
-      const rem = Math.ceil((raidDef.cooldownMs-(Date.now()-lastRun))/60000);
-      send(res,429,{error:'Cooldown ativo. Disponivel em '+rem+' min.'}); return;
-    }
-    room.members.push({ username, name: g.name, race: g.race, level: g.level });
-    saveDB(db);
-    // Notify room members
-    room.members.forEach(m => sendSSE(m.username,'raid_room_update',{ room, raidDef: { boss: raidDef.boss, slots: raidDef.slots, gold: raidDef.gold, xp: raidDef.xp, minLv: raidDef.minLv } }));
-    send(res,200,{ok:true, room}); return;
-  }
-
-  // GET /api/raid/room/:roomId — get room state
-  if (method === 'GET' && url.startsWith('/api/raid/room/')) {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
-    const roomId = url.slice('/api/raid/room/'.length);
-    const db = loadDB();
-    const room = db.raidRooms&&db.raidRooms[roomId];
-    if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
-    const raidDef = RAID_CATALOG[room.raidId];
-    send(res,200,{ room, raidDef: raidDef ? { boss: raidDef.boss, slots: raidDef.slots, gold: raidDef.gold, xp: raidDef.xp, minLv: raidDef.minLv } : null }); return;
-  }
-
-  // POST /api/raid/start — leader starts when room is ready
-  if (method === 'POST' && url === '/api/raid/start') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
-    const { roomId } = await readBody(req);
-    const db = loadDB();
-    const room = db.raidRooms&&db.raidRooms[roomId];
-    if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
-    if (room.leader !== username) { send(res,403,{error:'Apenas o lider pode iniciar.'}); return; }
-    if (room.status !== 'waiting') { send(res,400,{error:'Raid ja iniciada.'}); return; }
-    if (room.members.length < 2) { send(res,400,{error:'Precisa de pelo menos 2 jogadores.'}); return; }
-    const raidDef = RAID_CATALOG[room.raidId];
-    if (!raidDef) { send(res,400,{error:'Raid invalida.'}); return; }
-    room.status = 'active';
-    // Consume stamina from all members
-    room.members.forEach(m => {
-      const u = db.users[m.username];
-      if (u&&u.gameState) u.gameState.stam = Math.max(0, (u.gameState.stam||0) - raidDef.stam);
-    });
-    saveDB(db);
-    // Notify all members raid started
-    room.members.forEach(m => sendSSE(m.username,'raid_started',{ roomId, raidId: room.raidId, boss: raidDef.boss, members: room.members }));
-    send(res,200,{ok:true, room}); return;
-  }
-
-  // POST /api/raid/complete-v2 — resolve the raid with combined power
-  if (method === 'POST' && url === '/api/raid/complete-v2') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
-    const { roomId } = await readBody(req);
-    const db = loadDB();
-    const room = db.raidRooms&&db.raidRooms[roomId];
-    if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
-    if (room.leader !== username) { send(res,403,{error:'Apenas o lider finaliza.'}); return; }
-    if (room.status !== 'active') { send(res,400,{error:'Raid nao esta ativa.'}); return; }
-    const raidDef = RAID_CATALOG[room.raidId];
-    if (!raidDef) { send(res,400,{error:'Raid invalida.'}); return; }
-
-    // Combined power of all members
-    let totalPower = 0;
-    room.members.forEach(m => {
-      const u = db.users[m.username];
-      if (u&&u.gameState) totalPower += calcPower(u.gameState);
-    });
-
-    // Boss power = boss.hp * boss.atk / 1000 (tunable difficulty)
-    const bossPower = Math.round(raidDef.boss.hp * raidDef.boss.atk / 8000);
-    const winChance = Math.min(0.92, Math.max(0.10, 0.50 + (totalPower - bossPower) / bossPower * 0.5));
-    const won = Math.random() < winChance;
-
-    room.status = 'done';
-    room.won = won;
-    room.totalPower = totalPower;
-    room.bossPower = bossPower;
-
-    const n = room.members.length;
-    const results = [];
-
-    if (won) {
-      // XP and gold split equally
-      const xpTotal  = Math.round(raidDef.xp[0]  + Math.random()*(raidDef.xp[1]-raidDef.xp[0]));
-      const goldTotal = Math.round(raidDef.gold[0] + Math.random()*(raidDef.gold[1]-raidDef.gold[0]));
-      const xpEach   = Math.round(xpTotal  / n);
-      const goldEach = Math.round(goldTotal / n);
-
-      // Drops split: give one drop per member (rotate through drop list)
-      const shuffled = [...raidDef.drops].sort(()=>Math.random()-0.5);
-      // Bonus drop — rare item, only ONE lucky member gets it
-      const bonusWinner = Math.random() < raidDef.bonusDrop.chance
-        ? room.members[Math.floor(Math.random()*n)].username
-        : null;
-
-      room.members.forEach((m, i) => {
-        const u = db.users[m.username];
-        if (!u||!u.gameState) return;
-        const g = u.gameState;
-        g.gold = (g.gold||0) + goldEach;
-        g.xp   = (g.xp||0)  + xpEach;
-        g.stats = g.stats||{};
-        g.stats.missions = (g.stats.missions||0)+1;
-        if (!g.consumables) g.consumables = [];
-        if (!g.inventory)   g.inventory   = [];
-        // Stone drop — rotate
-        const stone = shuffled[i % shuffled.length];
-        g.consumables.push(stone);
-        // Bonus item drop
-        let bonusItem = null;
-        if (bonusWinner === m.username) {
-          bonusItem = raidDef.bonusDrop.item;
-          g.inventory.push(bonusItem);
-        }
-        // Set cooldown
-        if (!db.raidCooldowns) db.raidCooldowns = {};
-        db.raidCooldowns[m.username+'_'+room.raidId] = Date.now();
-        if (!g.log) g.log = [];
-        g.log.unshift({ msg:'🌋 Raid '+raidDef.boss.name+': +'+goldEach+' ouro +'+xpEach+' XP'+(bonusItem?' 🎁 item épico!':''), cls:'good' });
-        results.push({ username:m.username, name:m.name, xp:xpEach, gold:goldEach, stone, bonusItem });
-        sendSSE(m.username,'raid_complete',{ won:true, xp:xpEach, gold:goldEach, stone, bonusItem, bossName:raidDef.boss.name, totalPower, bossPower });
-      });
-    } else {
-      // Defeat — small XP consolation, no drops, set cooldown
-      const xpConsole = Math.round(raidDef.xp[0] * 0.10 / n);
-      room.members.forEach(m => {
-        const u = db.users[m.username];
-        if (!u||!u.gameState) return;
-        const g = u.gameState;
-        g.xp = (g.xp||0) + xpConsole;
-        if (!db.raidCooldowns) db.raidCooldowns = {};
-        db.raidCooldowns[m.username+'_'+room.raidId] = Date.now();
-        if (!g.log) g.log = [];
-        g.log.unshift({ msg:'🌋 Derrota na Raid '+raidDef.boss.name+'. +'+xpConsole+' XP de consolação.', cls:'bad' });
-        results.push({ username:m.username, name:m.name, xp:xpConsole, gold:0, stone:null, bonusItem:null });
-        sendSSE(m.username,'raid_complete',{ won:false, xp:xpConsole, gold:0, bossName:raidDef.boss.name, totalPower, bossPower });
-      });
-    }
-
-    // Clean up room after 5 min
-    setTimeout(() => { const d=loadDB(); if(d.raidRooms) delete d.raidRooms[roomId]; saveDB(d); }, 5*60*1000);
-    saveDB(db);
-    send(res,200,{ ok:true, won, results, totalPower, bossPower, winChance:Math.round(winChance*100) }); return;
-  }
-
-  // GET /api/raid/cooldowns — player's cooldowns
-  if (method === 'GET' && url === '/api/raid/cooldowns') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
-    const db = loadDB();
-    const cd = db.raidCooldowns||{};
-    const result = {};
-    Object.keys(RAID_CATALOG).forEach(rId => {
-      const key = username+'_'+rId;
-      const last = cd[key]||0;
-      const remaining = Math.max(0, RAID_CATALOG[rId].cooldownMs - (Date.now()-last));
-      result[rId] = remaining; // ms remaining, 0 = ready
-    });
-    send(res,200,{cooldowns:result}); return;
-  }
-
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // CLAN MISSION DISTRIBUTE — Split XP + gold equally among online clan members
-  // Body: { totalXp, totalGold, missionName, missionId }
-  // ═══════════════════════════════════════════════════════════════════════
-  if (method === 'POST' && url === '/api/clan/mission/distribute') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
-    const body = await readBody(req);
-    const totalXp   = Math.max(0, Math.floor(safeNumber(body.totalXp,   0, 1e15)));
-    const totalGold = Math.max(0, Math.floor(safeNumber(body.totalGold, 0, 1e12)));
-    const missionName = safeString(body.missionName || 'Missao de Cla', 80);
-
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user || !user.gameState || !user.gameState.clanName) {
-      // Not in a clan — just reward the solo player
-      send(res, 200, { ok: true, distributed: false, myShare: { xp: totalXp, gold: totalGold } });
-      return;
-    }
-
-    const clanName = user.gameState.clanName;
-
-    // Find all online clan members (including the one who completed it)
-    const clanMembers = Object.entries(db.users)
-      .filter(([u, d]) => d.gameState && d.gameState.clanName === clanName)
-      .map(([u, d]) => ({ username: u, gameState: d.gameState }));
-
-    // Split equally among ALL clan members (online or offline get same share)
-    // This encourages having a big active clan
-    const n = Math.max(1, clanMembers.length);
-    const xpEach   = Math.round(totalXp   / n);
-    const goldEach = Math.round(totalGold / n);
-
-    let myShare = { xp: xpEach, gold: goldEach };
-    const distributed = [];
-
-    clanMembers.forEach(({ username: u, gameState: g }) => {
-      g.gold = (g.gold || 0) + goldEach;
-      g.xp   = (g.xp   || 0) + xpEach;
-      g.stats = g.stats || {};
-      g.stats.missions = (g.stats.missions || 0) + 1;
-      if (!g.log) g.log = [];
-      g.log.unshift({ msg: '🛡 Clã "' + missionName + '": +' + xpEach + ' XP, +' + goldEach + ' ouro (1/' + n + ' membros)', cls: 'good' });
-      distributed.push({ username: u, xp: xpEach, gold: goldEach });
-
-      // Notify online members via SSE (except the one who did the mission — they get UI update)
-      if (u !== username && onlineMap.has(u)) {
-        sendSSE(u, 'clan_mission_reward', {
-          xp: xpEach, gold: goldEach,
-          missionName, totalMembers: n,
-          completedBy: user.gameState.name
-        });
-      }
-    });
-
-    saveDB(db);
-    send(res, 200, { ok: true, distributed: true, n, myShare, distributions: distributed });
-    return;
   }
 
   send(res, 404, { error: 'Endpoint nao encontrado.' });
@@ -3061,31 +2553,16 @@ server.listen(PORT, '0.0.0.0', () => {
   } else {
     console.log('  Seguranca: SECRET personalizado OK');
   }
-
-  // ── Initialize backup system ──
   console.log('\n[BACKUP] Sistema de backup automatico iniciado');
-  startupBackupCheck();          // Check on startup
-  scheduleMidnightBackup();      // Daily at midnight
-  scheduleHourlyBackup();        // Emergency hourly (keeps only 7)
+  startupBackupCheck();
+  scheduleMidnightBackup();
+  scheduleHourlyBackup();
   console.log('[BACKUP] Pasta: ./backups/  |  Diarios: ' + MAX_DAILY_BACKUPS + '  |  Horarios: ' + MAX_HOURLY_BACKUPS);
-
-  // ── Passive regeneration every 5 minutes ──
-  const REGEN_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  const REGEN_INTERVAL = 5 * 60 * 1000;
   setInterval(runPassiveRegen, REGEN_INTERVAL);
   console.log('[REGEN] Regeneracao passiva ativa: +10 HP +5 Estamina a cada 5 minutos');
-
-  // ── Run data migrations for existing players ──
   runMigrations();
 });
 
-// Graceful shutdown — backup before exit
-process.on('SIGINT', () => {
-  console.log('\n[BACKUP] Servidor parando — criando backup de emergencia...');
-  makeBackup('shutdown');
-  process.exit(0);
-});
-process.on('SIGTERM', () => {
-  console.log('\n[BACKUP] SIGTERM recebido — criando backup...');
-  makeBackup('shutdown');
-  process.exit(0);
-});
+process.on('SIGINT',  () => { console.log('\n[BACKUP] Parando...'); makeBackup('shutdown'); process.exit(0); });
+process.on('SIGTERM', () => { console.log('\n[BACKUP] SIGTERM...'); makeBackup('shutdown'); process.exit(0); });
