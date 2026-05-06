@@ -11,7 +11,18 @@ const path   = require('path');
 const crypto = require('crypto');
 
 const PORT    = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'db.json');
+// ── DATABASE PATH — supports Railway Volume Mount ──────────────────────────
+// If Railway Volume is mounted at /data, use it (survives deploys)
+// Otherwise fall back to local db.json (lost on redeploy)
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH
+  || (require('fs').existsSync('/data') ? '/data' : __dirname);
+const DB_FILE = require('path').join(DATA_DIR, 'db.json');
+if (DATA_DIR !== __dirname) {
+  console.log('[DB] Usando volume persistente: ' + DB_FILE);
+} else {
+  console.warn('[DB] AVISO: db.json na pasta local — sera perdido no redeploy!');
+  console.warn('[DB] Configure um Volume no Railway para persistir dados.');
+}
 const SECRET  = 'arathorn_secret_key_2024_change_in_production';
 
 // ADMIN — credentials for panel access
@@ -2857,6 +2868,39 @@ async function handleRequest(req, res) {
     saveDB(db);
     send(res, 200, { ok: true, distributed: true, n, myShare, distributions: distributed });
     return;
+  }
+
+
+  // GET /api/admin/export — download full db.json (for backup before deploy)
+  if (method === 'GET' && url.startsWith('/api/admin/export')) {
+    // Accept token via query param for direct browser download
+    const exportUrl = new URL('http://x' + url);
+    const qToken = exportUrl.searchParams.get('token') || '';
+    if (!verifyAdminToken(req) && (!qToken || !(global._adminTokens&&global._adminTokens[qToken]&&Date.now()<global._adminTokens[qToken]))) {
+      send(res,401,{error:'Não autorizado.'}); return;
+    }
+    const db = loadDB();
+    const json = JSON.stringify(db, null, 2);
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Content-Disposition': 'attachment; filename="arathorn_backup_' + new Date().toISOString().slice(0,10) + '.json"',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(json);
+    console.log('[ADMIN] DB exportado via painel admin');
+    return;
+  }
+
+  // POST /api/admin/import — restore db.json from upload
+  if (method === 'POST' && url === '/api/admin/import') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Não autorizado.'}); return; }
+    const body = await readBody(req);
+    if (!body || !body.users) { send(res,400,{error:'JSON inválido — precisa ter campo users.'}); return; }
+    // Validate basic structure
+    if (typeof body.users !== 'object') { send(res,400,{error:'Estrutura inválida.'}); return; }
+    saveDB(body);
+    console.log('[ADMIN] DB importado via painel admin. Users:', Object.keys(body.users).length);
+    send(res,200,{ok:true, users: Object.keys(body.users).length}); return;
   }
 
   send(res, 404, { error: 'Endpoint nao encontrado.' });

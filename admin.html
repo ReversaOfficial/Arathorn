@@ -86,7 +86,14 @@
   <div class="topbar">
     <h1>⚔ ARATHORN — Admin</h1>
     <div class="stats-row" style="padding:0;border:none;gap:8px;flex:1" id="stats-row"></div>
-    <button class="btn btn-sm" style="background:var(--bg3);color:var(--text2);margin-left:auto" onclick="adminLogout()">Sair</button>
+    <div style="display:flex;gap:6px;margin-left:auto;align-items:center">
+      <button class="btn btn-sm btn-blue" onclick="exportDB()" title="Baixar backup do banco antes do deploy">⬇ Exportar DB</button>
+      <label class="btn btn-sm" style="background:#2a4a1a;color:#8dcc6d;cursor:pointer;margin:0" title="Restaurar banco após deploy">
+        ⬆ Importar DB
+        <input type="file" accept=".json" onchange="importDB(this)" style="display:none">
+      </label>
+      <button class="btn btn-sm" style="background:var(--bg3);color:var(--text2)" onclick="adminLogout()">Sair</button>
+    </div>
   </div>
 
   <div class="main">
@@ -372,6 +379,31 @@ async function toggleBan() {
   if (res.error) { showToast(res.error,'red'); return; }
   showToast(newBanned?'🚫 '+selected.username+' banido':'✓ Ban removido de '+selected.username);
   await loadUsers(); selectUser(selected.username);
+}
+
+// ── EXPORT / IMPORT ──────────────────────────────────────────────────────────
+function exportDB() {
+  window.open('/api/admin/export?token='+encodeURIComponent(ADMIN_TOKEN), '_blank');
+}
+
+async function importDB(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!confirm('Restaurar banco de dados de "'+file.name+'"?\nIsso SOBRESCREVE todos os dados atuais!')) {
+    input.value=''; return;
+  }
+  const text = await file.text();
+  let data;
+  try { data = JSON.parse(text); } catch(e) { showToast('JSON inválido!','red'); return; }
+  const res = await fetch('/api/admin/import', {
+    method:'POST',
+    headers:{'Authorization':'Bearer '+ADMIN_TOKEN,'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  }).then(r=>r.json());
+  if (res.error) { showToast('Erro: '+res.error,'red'); return; }
+  showToast('✓ Banco restaurado! '+res.users+' usuários importados.');
+  input.value='';
+  await loadUsers();
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────
