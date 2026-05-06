@@ -803,11 +803,21 @@ async function handleRequest(req, res) {
       gameState.gold  = Math.max(0, gameState.gold);
 
       // ── PROTECT SERVER-MANAGED FIELDS — client cannot overwrite these ──
-      // Clan role/name set by server routes only (not saveable by client)
+      // Clan role/name: client can send same values (for sync), but cannot
+      // change to a DIFFERENT clan. If different, revert to server value.
       if (existing.clanName !== undefined) {
-        gameState.clanName = existing.clanName;
-        gameState.clanTag  = existing.clanTag;
-        gameState.clanRole = existing.clanRole;
+        // Allow if same clan (just a save sync) or if server has no clan
+        const sameOrEmpty = !existing.clanName || existing.clanName === gameState.clanName;
+        if (!sameOrEmpty) {
+          // Client trying to change clan via save — revert to server value
+          gameState.clanName = existing.clanName;
+          gameState.clanTag  = existing.clanTag;
+          gameState.clanRole = existing.clanRole;
+        }
+        // But always keep the role in sync with server (prevent self-promotion)
+        if (gameState.clanName === existing.clanName) {
+          gameState.clanRole = existing.clanRole;
+        }
       }
       // Server assassin title — client can't self-assign
       if (!existing.isServerAssassin) {
@@ -2901,6 +2911,44 @@ async function handleRequest(req, res) {
     saveDB(body);
     console.log('[ADMIN] DB importado via painel admin. Users:', Object.keys(body.users).length);
     send(res,200,{ok:true, users: Object.keys(body.users).length}); return;
+  }
+
+
+  // POST /api/clan/create — create a new clan (server-authoritative)
+  if (method === 'POST' && url === '/api/clan/create') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const { clanName, clanTag } = await readBody(req);
+    const name = safeString(clanName||'', 40).trim();
+    const tag  = safeString(clanTag||'',  4).trim().toUpperCase();
+    if (!name || name.length < 2) { send(res,400,{error:'Nome do clã muito curto (mín. 2 chars).'}); return; }
+    if (!tag || tag.length < 2 || tag.length > 4) { send(res,400,{error:'Tag: 2-4 letras.'}); return; }
+    if (!/^[A-Z0-9]+$/.test(tag)) { send(res,400,{error:'Tag: apenas letras e números.'}); return; }
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    if (user.gameState.clanName) { send(res,400,{error:'Voce ja pertence a um cla.'}); return; }
+    // Check if clan name or tag already exists
+    const existing = Object.values(db.users).find(u =>
+      u.gameState && (
+        (u.gameState.clanName||'').toLowerCase() === name.toLowerCase() ||
+        (u.gameState.clanTag||'').toUpperCase()  === tag
+      )
+    );
+    if (existing) { send(res,409,{error:'Nome ou tag já em uso por outro clã.'}); return; }
+    // Create — set on the user's gameState directly (server-authoritative)
+    user.gameState.clanName   = name;
+    user.gameState.clanTag    = tag;
+    user.gameState.clanRole   = 'leader';
+    user.gameState.clanFounded= Date.now();
+    user.gameState.clanWins   = 0;
+    user.gameState.clanGold   = 0;
+    if (!user.gameState.log) user.gameState.log = [];
+    user.gameState.log.unshift({ msg: '🛡 Fundou o clã "'+name+'" ['+tag+']!', cls:'good' });
+    saveDB(db);
+    console.log('[CLAN] Criado:', name, '['+tag+'] por', username);
+    send(res, 200, { ok:true, clanName: name, clanTag: tag, clanRole:'leader', clanFounded: user.gameState.clanFounded });
+    return;
   }
 
   send(res, 404, { error: 'Endpoint nao encontrado.' });

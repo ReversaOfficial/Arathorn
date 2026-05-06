@@ -4584,15 +4584,24 @@ function gainXP(amount) {
 // ══════════════════════════════════════════════════════════
 function openCreateClan() {
   showModal('⚔ Fundar um Clã','Escolha um nome e tag para seu clã de guerra.',
-    [{label:'Cancelar',fn:closeModal},{label:'Fundar',cls:'btn-gold',fn:()=>{
+    [{label:'Cancelar',fn:closeModal},{label:'Fundar',cls:'btn-gold',fn:async ()=>{
       const n=document.getElementById('mi-clan-name').value.trim();
       const t=document.getElementById('mi-clan-tag').value.trim().toUpperCase();
-      if(!n){toast('Digite um nome!','bad');return;}
+      if(!n||n.length<2){toast('Nome muito curto!','bad');return;}
       if(!t||t.length<2||t.length>4){toast('Tag: 2-4 letras!','bad');return;}
-      G.clanName=n;G.clanTag=t;G.clanRole='leader';G.clanFounded=Date.now();G.clanMembers=[];G.clanWins=0;G.clanGold=0;
-      addLog('🛡️ Fundou o clã "'+n+'" ['+t+']!','info');
-      toast('⚔ Clã "'+n+'" fundado!','info');
-      closeModal();updateUI();renderClan();forceSave();
+      // ── SERVER-AUTHORITATIVE clan creation ──
+      const res = await api('POST','/api/clan/create',{clanName:n, clanTag:t});
+      if(res.error){toast(res.error,'bad');return;}
+      // Server confirmed — update local state
+      G.clanName=res.clanName; G.clanTag=res.clanTag;
+      G.clanRole='leader'; G.clanFounded=res.clanFounded;
+      G.clanWins=0; G.clanGold=0;
+      addLog('🛡️ Fundou o clã "'+n+'" ['+t+']!','good');
+      toast('⚔ Clã "'+n+'" fundado!','good');
+      closeModal();
+      // Save to persist the clan data
+      await api('POST','/api/save',{gameState:G});
+      updateUI(); renderClan();
     }}]
   );
   setTimeout(()=>{
