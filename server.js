@@ -14,6 +14,11 @@ const PORT    = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'db.json');
 const SECRET  = 'arathorn_secret_key_2024_change_in_production';
 
+// ADMIN — credentials for panel access
+const ADMIN_USER = process.env.ADMIN_USER || 'arathorn';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'A1bc3@admin';
+const ADMIN_PANEL_SECRET = process.env.ADMIN_PANEL_SECRET || 'arathorn_panel_2024';
+
 // ONLINE TRACKING
 const onlineMap  = new Map(); // username -> { lastSeen, name, race, level, power, clanName }
 const sseClients = new Map(); // username -> res
@@ -500,6 +505,66 @@ function runMigrations() {
   } else {
     console.log('[MIGRATION] All players up to date.');
   }
+}
+
+
+// ── SERVER-SIDE LEVEL UP ─────────────────────────────────────────────────────
+// Mirrors the client xpForLevel and gainXP logic
+// Called whenever XP is added on the server (party, clan missions, etc)
+function xpForLevelServer(level) {
+  if (level <= 1) return 100;
+  return Math.round(100 * Math.pow(level, 2.8) * (1 + level / 500));
+}
+
+function RACES_SERVER() {
+  return {
+    elfo:   { hp:6,  str:0,  dex:3,  mag:2,  res:0  },
+    orc:    { hp:10, str:4,  dex:0,  mag:0,  res:2  },
+    anao:   { hp:9,  str:3,  dex:0,  mag:0,  res:3  },
+    humano: { hp:7,  str:1,  dex:1,  mag:1,  res:1  },
+    druida: { hp:7,  str:0,  dex:1,  mag:3,  res:2  },
+    mago:   { hp:5,  str:0,  dex:2,  mag:4,  res:0  },
+  };
+}
+
+function applyServerLevelUps(g) {
+  // Returns number of levels gained
+  if (!g) return 0;
+  const races = RACES_SERVER();
+  const raceBonus = races[g.race] || races.humano;
+  let levelsGained = 0;
+
+  while (g.xp >= (g.xpNext || xpForLevelServer(g.level || 1))) {
+    const curLevel = g.level || 1;
+    const needed   = g.xpNext || xpForLevelServer(curLevel);
+    if (g.xp < needed) break;
+
+    g.level  = curLevel + 1;
+    g.xp    -= needed;
+    g.xpNext = xpForLevelServer(g.level);
+    levelsGained++;
+
+    // Apply stat gains per level (same as client gainXP)
+    g.str    = (g.str    || 10) + 2 + raceBonus.str;
+    g.dex    = (g.dex    || 10) + 2 + raceBonus.dex;
+    g.mag    = (g.mag    || 10) + 2 + raceBonus.mag;
+    g.res    = (g.res    || 10) + 2 + raceBonus.res;
+    g.hpMax  = (g.hpMax  || 90) + 5 + raceBonus.hp;
+    g.hp     = g.hpMax; // full heal on level up
+    g.stamMax= Math.min(50, (g.stamMax || 10) + 1);
+
+    // VIP bonus: +5 to all stats per level
+    if (g.vipUntil && g.vipUntil > Date.now()) {
+      g.str += 5; g.dex += 5; g.mag += 5; g.res += 5;
+    }
+
+    if (!g.log) g.log = [];
+    g.log.unshift({ msg: '🎉 LEVEL UP! Nível ' + g.level + '! Atributos melhorados!', cls: 'good' });
+
+    if (levelsGained > 50) break; // safety cap
+  }
+
+  return levelsGained;
 }
 
 function sendFile(res, fp, ct) {
@@ -2158,15 +2223,24 @@ async function handleRequest(req, res) {
       const tUser = db.users[m.username];
       if (!tUser||!tUser.gameState) return;
       const g = tUser.gameState;
-      // Apply XP — let client handle level up via load
-      g.xp = (g.xp||0) + xpShare;
+      g.xp   = (g.xp||0)   + xpShare;
       g.gold = (g.gold||0) + goldShare;
       g.stats = g.stats||{};
       g.stats.missions = (g.stats.missions||0) + 1;
+
+      // ── SERVER-SIDE LEVEL UP — critical fix for party members ────────────
+      const levelsGained = applyServerLevelUps(g);
+
       if (!g.log) g.log = [];
-      g.log.unshift({msg:'🎉 Party "'+(missionName||'Missão')+'": +'+xpShare+' XP, +'+goldShare+' ouro ('+pct+'%)', cls:'good'});
-      distributions.push({ username: m.username, name: m.name, pct, xp: xpShare, gold: goldShare });
-      sendSSE(m.username, 'party_reward', { xp: xpShare, gold: goldShare, pct, missionName: missionName||'Missão' });
+      const lvMsg = levelsGained > 0 ? ' 🎉 LEVEL UP x'+levelsGained+'! Nível '+g.level+'!' : '';
+      g.log.unshift({msg:'🎉 Party "'+(missionName||'Missão')+'": +'+xpShare+' XP, +'+goldShare+' ouro ('+pct+'%)'+lvMsg, cls:'good'});
+      distributions.push({ username: m.username, name: m.name, pct, xp: xpShare, gold: goldShare, newLevel: g.level, levelsGained });
+      sendSSE(m.username, 'party_reward', {
+        xp: xpShare, gold: goldShare, pct,
+        missionName: missionName||'Missão',
+        newLevel: g.level, levelsGained,
+        newXp: g.xp, xpNext: g.xpNext
+      });
     });
 
     saveDB(db);
@@ -2532,6 +2606,238 @@ async function handleRequest(req, res) {
     saveDB(db);
     console.log('[RECOVER] Senha redefinida via pergunta secreta:', username);
     send(res,200,{ok:true}); return;
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ADMIN PANEL ROUTES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Serve admin panel HTML
+  if (method === 'GET' && url === '/admin') {
+    sendFile(res, path.join(__dirname, 'admin.html'), 'text/html; charset=utf-8'); return;
+  }
+
+  // POST /api/admin/login — admin authentication
+  if (method === 'POST' && url === '/api/admin/login') {
+    const body = await readBody(req);
+    const { username, password } = body;
+    if (username === ADMIN_USER && password === ADMIN_PASS) {
+      const token = crypto.createHmac('sha256', SECRET).update('admin:' + ADMIN_USER + ':' + Date.now()).digest('hex');
+      // Store token temporarily (valid 8h)
+      if (!global._adminTokens) global._adminTokens = {};
+      global._adminTokens[token] = Date.now() + 8 * 60 * 60 * 1000;
+      send(res, 200, { ok: true, token }); return;
+    }
+    send(res, 401, { error: 'Credenciais inválidas.' }); return;
+  }
+
+  // Admin auth middleware helper
+  function verifyAdminToken(req) {
+    const auth = req.headers['authorization'] || '';
+    const token = auth.replace('Bearer ', '').trim();
+    if (!token) return false;
+    if (!global._adminTokens) return false;
+    const expiry = global._adminTokens[token];
+    if (!expiry || Date.now() > expiry) { delete global._adminTokens[token]; return false; }
+    return true;
+  }
+
+  // GET /api/admin/users — list all users with summary
+  if (method === 'GET' && url === '/api/admin/users') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Não autorizado.'}); return; }
+    const db = loadDB();
+    const users = Object.entries(db.users).map(([u, d]) => {
+      const g = d.gameState;
+      return {
+        username: u,
+        name:     g ? g.name    : '—',
+        level:    g ? g.level   : 0,
+        xp:       g ? g.xp     : 0,
+        gold:     g ? g.gold    : 0,
+        str:      g ? g.str     : 0,
+        dex:      g ? g.dex     : 0,
+        mag:      g ? g.mag     : 0,
+        res:      g ? g.res     : 0,
+        hp:       g ? g.hp      : 0,
+        hpMax:    g ? g.hpMax   : 0,
+        stam:     g ? g.stam    : 0,
+        stamMax:  g ? g.stamMax : 0,
+        race:     g ? g.race    : '—',
+        clanName: g ? (g.clanName||'—') : '—',
+        vipUntil: g ? (g.vipUntil||0)   : 0,
+        pvpWins:  g ? ((g.stats&&g.stats.pvpWins)||0) : 0,
+        missions: g ? ((g.stats&&g.stats.missions)||0) : 0,
+        createdAt: d.createdAt || 0,
+        lastLogin: d.lastLogin  || 0,
+        online:    onlineMap.has(u),
+        hasChar:   !!g,
+        isServerAssassin: g ? !!g.isServerAssassin : false,
+      };
+    }).sort((a,b) => b.level - a.level);
+    send(res, 200, { users, total: users.length }); return;
+  }
+
+  // POST /api/admin/edit — edit a player's gameState fields
+  if (method === 'POST' && url === '/api/admin/edit') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Não autorizado.'}); return; }
+    const body = await readBody(req);
+    const { targetUsername, changes } = body;
+    if (!targetUsername || !changes || typeof changes !== 'object') { send(res,400,{error:'Dados inválidos.'}); return; }
+    const db = loadDB();
+    const user = db.users[targetUsername.toLowerCase()];
+    if (!user || !user.gameState) { send(res,404,{error:'Usuário não encontrado.'}); return; }
+    const g = user.gameState;
+    const allowed = ['level','xp','gold','str','dex','mag','res','hp','hpMax','stam','stamMax','mana','manaMax'];
+    const applied = {};
+    allowed.forEach(field => {
+      if (changes[field] !== undefined) {
+        const val = Math.max(0, Math.floor(Number(changes[field])||0));
+        g[field] = val;
+        applied[field] = val;
+      }
+    });
+    if (changes.xpNext !== undefined) g.xpNext = Math.max(0, Math.floor(Number(changes.xpNext)||0));
+    if (!g.log) g.log = [];
+    g.log.unshift({ msg: '👑 Admin editou seu personagem: ' + JSON.stringify(applied), cls: 'info' });
+    saveDB(db);
+    sendSSE(targetUsername.toLowerCase(), 'admin_edit', { changes: applied, msg: '👑 Seu personagem foi editado pelo administrador!' });
+    console.log('[ADMIN] Edited', targetUsername, ':', applied);
+    send(res, 200, { ok: true, applied }); return;
+  }
+
+  // POST /api/admin/vip — add VIP days to a user
+  if (method === 'POST' && url === '/api/admin/vip') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Não autorizado.'}); return; }
+    const body = await readBody(req);
+    const { targetUsername, days } = body;
+    const numDays = Math.max(1, Math.min(3650, Math.floor(Number(days)||0)));
+    if (!targetUsername || !numDays) { send(res,400,{error:'Dados inválidos.'}); return; }
+    const db = loadDB();
+    const user = db.users[targetUsername.toLowerCase()];
+    if (!user || !user.gameState) { send(res,404,{error:'Usuário não encontrado.'}); return; }
+    const g = user.gameState;
+    const now = Date.now();
+    const current = (g.vipUntil && g.vipUntil > now) ? g.vipUntil : now;
+    g.vipUntil = current + numDays * 24 * 60 * 60 * 1000;
+    if (!g.log) g.log = [];
+    g.log.unshift({ msg: '👑 Admin adicionou ' + numDays + ' dias de VIP!', cls: 'good' });
+    saveDB(db);
+    sendSSE(targetUsername.toLowerCase(), 'admin_edit', { changes: { vipUntil: g.vipUntil }, msg: '👑 Você recebeu ' + numDays + ' dia(s) de VIP do administrador!' });
+    console.log('[ADMIN] Added', numDays, 'VIP days to', targetUsername);
+    send(res, 200, { ok: true, vipUntil: g.vipUntil }); return;
+  }
+
+  // POST /api/admin/gold — give gold to a user
+  if (method === 'POST' && url === '/api/admin/gold') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Não autorizado.'}); return; }
+    const body = await readBody(req);
+    const { targetUsername, amount } = body;
+    const num = Math.floor(Number(amount)||0);
+    if (!targetUsername || !num) { send(res,400,{error:'Dados inválidos.'}); return; }
+    const db = loadDB();
+    const user = db.users[targetUsername.toLowerCase()];
+    if (!user || !user.gameState) { send(res,404,{error:'Usuário não encontrado.'}); return; }
+    user.gameState.gold = Math.max(0, (user.gameState.gold||0) + num);
+    if (!user.gameState.log) user.gameState.log = [];
+    user.gameState.log.unshift({ msg: '👑 Admin adicionou ' + num.toLocaleString() + ' ouro!', cls: 'good' });
+    saveDB(db);
+    sendSSE(targetUsername.toLowerCase(), 'admin_edit', { changes: { gold: user.gameState.gold }, msg: '👑 Admin adicionou ' + num.toLocaleString() + ' ouro à sua conta!' });
+    send(res, 200, { ok: true, newGold: user.gameState.gold }); return;
+  }
+
+  // POST /api/admin/resetpass — reset a user's password
+  if (method === 'POST' && url === '/api/admin/resetpass') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Não autorizado.'}); return; }
+    const body = await readBody(req);
+    const { targetUsername, newPassword } = body;
+    if (!targetUsername || !newPassword || newPassword.length < 6) { send(res,400,{error:'Dados inválidos.'}); return; }
+    const db = loadDB();
+    const user = db.users[targetUsername.toLowerCase()];
+    if (!user) { send(res,404,{error:'Usuário não encontrado.'}); return; }
+    user.password = hashPassword(newPassword);
+    saveDB(db);
+    console.log('[ADMIN] Password reset for', targetUsername);
+    send(res, 200, { ok: true }); return;
+  }
+
+  // POST /api/admin/ban — toggle ban on user
+  if (method === 'POST' && url === '/api/admin/ban') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Não autorizado.'}); return; }
+    const body = await readBody(req);
+    const { targetUsername, banned } = body;
+    const db = loadDB();
+    const user = db.users[(targetUsername||'').toLowerCase()];
+    if (!user) { send(res,404,{error:'Usuário não encontrado.'}); return; }
+    user.banned = !!banned;
+    saveDB(db);
+    if (banned) sendSSE(targetUsername.toLowerCase(), 'admin_ban', { msg: 'Sua conta foi suspensa pelo administrador.' });
+    console.log('[ADMIN]', banned?'Banned':'Unbanned', targetUsername);
+    send(res, 200, { ok: true, banned: user.banned }); return;
+  }
+
+  // GET /api/admin/stats — server-wide stats
+  if (method === 'GET' && url === '/api/admin/stats') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Não autorizado.'}); return; }
+    const db = loadDB();
+    const users = Object.values(db.users);
+    const withChar = users.filter(u => u.gameState);
+    const vipNow = withChar.filter(u => u.gameState.vipUntil && u.gameState.vipUntil > Date.now());
+    send(res, 200, {
+      totalUsers: users.length,
+      withCharacter: withChar.length,
+      onlineNow: onlineMap.size,
+      vipActive: vipNow.length,
+      totalCrimes: (db.globalStats && db.globalStats.totalCrimes) || 0,
+      serverAssassin: (db.globalStats && db.globalStats.serverAssassin) || null,
+    }); return;
+  }
+
+
+  // ── CLAN MISSION DISTRIBUTE ──────────────────────────────────────────────
+  if (method === 'POST' && url === '/api/clan/mission/distribute') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const body = await readBody(req);
+    const totalXp   = Math.max(0, Math.floor(safeNumber(body.totalXp,   0, 1e15)));
+    const totalGold = Math.max(0, Math.floor(safeNumber(body.totalGold, 0, 1e12)));
+    const missionName = safeString(body.missionName || 'Missao de Cla', 80);
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user || !user.gameState || !user.gameState.clanName) {
+      send(res, 200, { ok: true, distributed: false, myShare: { xp: totalXp, gold: totalGold } });
+      return;
+    }
+    const clanName = user.gameState.clanName;
+    const clanMembers = Object.entries(db.users)
+      .filter(([u, d]) => d.gameState && d.gameState.clanName === clanName)
+      .map(([u, d]) => ({ username: u, gameState: d.gameState }));
+    const n = Math.max(1, clanMembers.length);
+    const xpEach   = Math.round(totalXp   / n);
+    const goldEach = Math.round(totalGold / n);
+    let myShare = { xp: xpEach, gold: goldEach };
+    const distributed = [];
+    clanMembers.forEach(({ username: u, gameState: g }) => {
+      g.gold = (g.gold || 0) + goldEach;
+      g.xp   = (g.xp   || 0) + xpEach;
+      g.stats = g.stats || {};
+      g.stats.missions = (g.stats.missions || 0) + 1;
+      // ── SERVER-SIDE LEVEL UP ──
+      const lvGained = applyServerLevelUps(g);
+      const lvMsg = lvGained > 0 ? ' 🎉 LEVEL UP! Nível ' + g.level + '!' : '';
+      if (!g.log) g.log = [];
+      g.log.unshift({ msg: '🛡 Clã "' + missionName + '": +' + xpEach + ' XP, +' + goldEach + ' ouro (1/' + n + ' membros)' + lvMsg, cls: 'good' });
+      distributed.push({ username: u, xp: xpEach, gold: goldEach, newLevel: g.level, levelsGained: lvGained });
+      if (u !== username && onlineMap.has(u)) {
+        sendSSE(u, 'clan_mission_reward', {
+          xp: xpEach, gold: goldEach, missionName, totalMembers: n,
+          completedBy: user.gameState.name, newLevel: g.level, levelsGained: lvGained
+        });
+      }
+    });
+    saveDB(db);
+    send(res, 200, { ok: true, distributed: true, n, myShare, distributions: distributed });
+    return;
   }
 
   send(res, 404, { error: 'Endpoint nao encontrado.' });

@@ -909,6 +909,10 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
     </div>
 
   </div>
+  <!-- Admin access link — subtle, at the bottom -->
+  <div style="text-align:center;margin-top:16px">
+    <a href="/admin" style="color:var(--text3,#443322);font-size:11px;font-family:Cinzel,serif;letter-spacing:2px;text-decoration:none;opacity:.4;transition:opacity .2s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='.4'">arathorn</a>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════
@@ -2976,18 +2980,57 @@ function addLog(msg, cls='') {
 // ══════════════════════════════════════════════════════════
 // UI UPDATE
 // ══════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════
+// EFFECTIVE STATS — base + all equip bonuses combined
+// Use this everywhere instead of G.str, G.hp directly
+// ══════════════════════════════════════════════════════════
+function getEffectiveStats() {
+  const eqStr   = getEquipBonus('str') || 0;
+  const eqDex   = getEquipBonus('dex') || 0;
+  const eqMag   = getEquipBonus('mag') || 0;
+  const eqRes   = getEquipBonus('res') || 0;
+  const eqAtk   = getEquipBonus('atk') || 0;
+  const eqDef   = getEquipBonus('def') || 0;
+  const eqHp    = getEquipBonus('hp')  || 0;
+  const eqMana  = getEquipBonus('mana') || 0;
+  const eqStam  = getEquipBonus('stam') || 0;
+
+  // Stam necklace bonus
+  const hasStamNeck = Object.values(G.equipment||{})
+    .some(eId => eId && typeof basePureId === 'function' && basePureId(eId) === 'neck_endurance');
+  const neckStam = hasStamNeck ? 10 : 0;
+
+  return {
+    str:     G.str  + eqStr  + eqAtk,
+    dex:     G.dex  + eqDex,
+    mag:     G.mag  + eqMag,
+    res:     G.res  + eqRes  + eqDef,
+    hpMax:   G.hpMax + eqHp,
+    manaMax: (G.manaMax || 90) + eqMana,
+    stamMax: G.stamMax + neckStam + eqStam,
+    // Bonuses only (for display)
+    bonusStr:   eqStr + eqAtk,
+    bonusDex:   eqDex,
+    bonusMag:   eqMag,
+    bonusRes:   eqRes + eqDef,
+    bonusHp:    eqHp,
+    bonusMana:  eqMana,
+    bonusStam:  neckStam + eqStam,
+  };
+}
+
 function updateUI() {
   const race = RACES[G.race] || RACES.humano;
   const icon = race.icon;
   // Topbar
   [document.getElementById('hud-hp-bar')].forEach(el => el && (el.style.width = pct(G.hp, G.hpMax)));
-  se('hud-hp-label', G.hp+'/'+G.hpMax);
+  se('hud-hp-label', G.hp + '/' + getEffectiveStats().hpMax);
   const mb = document.getElementById('hud-mana-bar'); if (mb) mb.style.width = pct(G.mana, G.manaMax);
   se('hud-mana-label', G.mana+'/'+G.manaMax);
   const sb = document.getElementById('hud-stam-bar'); if (sb) sb.style.width = pct(G.stam, G.stamMax);
-  const _hasStamNeckHud = Object.values(G.equipment||{}).some(eId => eId && typeof basePureId === 'function' && basePureId(eId) === 'neck_endurance');
-  const _hudStamMax = G.stamMax + (_hasStamNeckHud ? 10 : 0);
-  se('hud-stam-label', G.stam+'/'+_hudStamMax);
+  const _hudEff = getEffectiveStats();
+  se('hud-stam-label', G.stam + '/' + _hudEff.stamMax);
   // Knocked out indicator
   const koEl = document.getElementById('ko-indicator');
   if (koEl) {
@@ -3055,28 +3098,21 @@ function updateUI() {
     const b = document.getElementById(barId); if (b) b.style.width = pct(v, mx);
     se(txtId, v+'/'+mx);
   }
-  setBar('p-hp-bar','p-hp-txt',G.hp,G.hpMax);
-  setBar('p-mana-bar','p-mana-txt',G.mana,G.manaMax);
-  // Colar da Resistência: +10 stam máx enquanto equipado
-  const _hasStamNeck = Object.values(G.equipment||{}).some(eId => eId && basePureId(eId) === 'neck_endurance');
-  const _effectiveStamMax = G.stamMax + (_hasStamNeck ? 10 : 0);
-  if (_hasStamNeck && G.stam > _effectiveStamMax) G.stam = _effectiveStamMax;
-  setBar('p-stam-bar','p-stam-txt',G.stam,_effectiveStamMax);
-  setBar('p-xp-bar','p-xp-txt',G.xp,G.xpNext);
-  setBar('rp-hp-bar','rp-hp-txt',G.hp,G.hpMax);
-  setBar('rp-mana-bar','rp-mana-txt',G.mana,G.manaMax);
-  setBar('rp-stam-bar','rp-stam-txt',G.stam,G.stamMax);
+  // Bars use EFFECTIVE max (includes equip bonuses)
+  const _eff2 = getEffectiveStats();
+  setBar('p-hp-bar',   'p-hp-txt',   G.hp,   _eff2.hpMax);
+  setBar('p-mana-bar', 'p-mana-txt', G.mana, _eff2.manaMax);
+  // Use effective stats for all bars (base + equip bonuses)
+  const _effBars = getEffectiveStats();
+  if (G.stam > _effBars.stamMax) G.stam = _effBars.stamMax;
+  setBar('p-stam-bar', 'p-stam-txt', G.stam, _effBars.stamMax);
+  setBar('p-xp-bar',   'p-xp-txt',   G.xp,   G.xpNext);
+  setBar('rp-hp-bar',   'rp-hp-txt',   G.hp,   _effBars.hpMax);
+  setBar('rp-mana-bar', 'rp-mana-txt', G.mana, _effBars.manaMax);
+  setBar('rp-stam-bar', 'rp-stam-txt', G.stam, _effBars.stamMax);
   setBar('rp-xp-bar','rp-xp-txt',G.xp,G.xpNext);
-  // Attrs — show base + equip bonus clearly
-  const eqStr = getEquipBonus('str')||getEquipBonus('atk')||0;
-  const eqDex = getEquipBonus('dex')||0;
-  const eqMag = getEquipBonus('mag')||0;
-  const eqRes = getEquipBonus('res')||getEquipBonus('def')||0;
-  const totalStr = G.str + eqStr;
-  const totalDex = G.dex + eqDex;
-  const totalMag = G.mag + eqMag;
-  const totalRes = G.res + eqRes;
-  // Set stat values — use innerHTML for bonus display
+  // Attrs — use getEffectiveStats() as single source of truth
+  const eff = getEffectiveStats();
   function setStatEl(id, base, bonus) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -3086,19 +3122,19 @@ function updateUI() {
       el.textContent = base + bonus;
     }
   }
-  setStatEl('p-str', G.str, eqStr);
-  setStatEl('p-dex', G.dex, eqDex);
-  setStatEl('p-mag', G.mag, eqMag);
-  setStatEl('p-res', G.res, eqRes);
-  // XP bar with next-level info
+  setStatEl('p-str',  G.str,     eff.bonusStr);
+  setStatEl('p-dex',  G.dex,     eff.bonusDex);
+  setStatEl('p-mag',  G.mag,     eff.bonusMag);
+  setStatEl('p-res',  G.res,     eff.bonusRes);
+  // XP bar
   const xpPct = Math.round(G.xp / G.xpNext * 100);
   se('p-xp-txt', G.xp + ' / ' + G.xpNext + ' XP');
   se('p-xp-pct', xpPct + '% concluído');
   se('p-lvl-inline', G.level);
-  se('p-hp-max', G.hpMax);
-  se('p-mana-max', G.manaMax);
-  // Also update stamMax display if element exists
-  se('p-stam-max-stat', G.stamMax);
+  // HP/Mana/Stam show EFFECTIVE max (base + equip bonuses)
+  se('p-hp-max',        eff.hpMax);
+  se('p-mana-max',      eff.manaMax);
+  se('p-stam-max-stat', eff.stamMax);
   se('p-gold', G.gold);
   se('p-missions', G.stats.missions||0);
   se('p-kills', G.stats.kills||0);
@@ -4154,36 +4190,36 @@ function openCombat(m, enemyName) {
     logBox.prepend(d);
   }
 
-  // ── Player stats (base + equipment bonuses) ──────────────────────────────
-  const playerAtk = G.str + (getEquipBonus('str')||0) + (getEquipBonus('atk')||0)
-    + (G.buffs||[]).filter(b=>b.buff==='str').reduce((s,b)=>s+b.val,0);
-  const playerDef = G.res + (getEquipBonus('res')||0) + (getEquipBonus('def')||0)
-    + (G.buffs||[]).filter(b=>b.buff==='res').reduce((s,b)=>s+b.val,0);
-  const playerMag = G.mag + (getEquipBonus('mag')||0);
+  // ── Player stats — use effective stats (includes ALL equip bonuses) ─────
+  const _cEff = getEffectiveStats();
+  const playerAtk = _cEff.str + (G.buffs||[]).filter(b=>b.buff==='str').reduce((s,b)=>s+b.val,0);
+  const playerDef = _cEff.res + (G.buffs||[]).filter(b=>b.buff==='res').reduce((s,b)=>s+b.val,0);
+  const playerMag = _cEff.mag;
 
   // ── Enemy stats — scale with mission level ────────────────────────────────
   // Enemy HP: based on mission level. Player needs enough HP to survive.
   const enemyAtk  = Math.round(m.minLv * 4 + 8);          // damage per turn
   const enemyHpMax= Math.round(m.minLv * 15 + 40 + Math.random() * 20);
   let enemyHp     = enemyHpMax;
-  let playerHp    = G.hp;  // ← uses REAL current HP, not max
+  const _combatHpMax = getEffectiveStats().hpMax;  // includes equip HP bonuses
+  let playerHp = Math.min(G.hp, _combatHpMax);  // current HP capped at effective max
 
   // ── Show initial HP bars ──────────────────────────────────────────────────
   function updateBars() {
-    se('c-player-hp', Math.max(0, playerHp) + ' / ' + G.hpMax + ' HP');
+    se('c-player-hp', Math.max(0, playerHp) + ' / ' + _combatHpMax + ' HP');
     se('c-enemy-hp',  Math.max(0, enemyHp)  + ' / ' + enemyHpMax + ' HP');
     // Update bar widths if elements exist
     const pb = document.getElementById('c-player-hp-bar');
     const eb = document.getElementById('c-enemy-hp-bar');
-    if (pb) pb.style.width = Math.max(0, Math.round(playerHp / G.hpMax * 100)) + '%';
+    if (pb) pb.style.width = Math.max(0, Math.round(playerHp / _combatHpMax * 100)) + '%';
     if (eb) eb.style.width = Math.max(0, Math.round(enemyHp  / enemyHpMax * 100)) + '%';
   }
   updateBars();
 
   // ── Warn if HP is dangerously low for this mission ───────────────────────
-  const minSafeHp = enemyAtk * 4; // survive at least 4 hits
+  const minSafeHp = enemyAtk * 4;
   if (playerHp < minSafeHp) {
-    clog('⚠️ HP crítico! (' + playerHp + '/' + G.hpMax + ') — Você pode não sobreviver!', 'var(--red-light)');
+    clog('⚠️ HP crítico! (' + playerHp + '/' + _combatHpMax + ') — Você pode não sobreviver!', 'var(--red-light)');
   }
 
   clog('⚔️ Iniciando batalha! Inimigo: ' + enemyName + ' (HP: ' + enemyHpMax + ')', 'var(--text-muted)');
@@ -4824,7 +4860,8 @@ function initGame() {
   setTimeout(registerTavernSSEHandlers, 1200);
   setTimeout(registerPartySSEHandlers, 1300);
   setTimeout(registerShopSSEHandlers, 1400);
-  setTimeout(registerAssassinSSEHandlers, 1500);
+  setTimeout(registerAdminSSEHandlers, 1500);
+  setTimeout(registerAssassinSSEHandlers, 1600);
   setTimeout(registerRaidSSEHandlers, 1600);
   setTimeout(registerClanMissionSSEHandler, 1700);
   setTimeout(loadPartyState, 1500);
@@ -7165,10 +7202,13 @@ function registerClanMissionSSEHandler() {
   if (!sseConn) return;
   sseConn.addEventListener('clan_mission_reward', e => {
     const d = JSON.parse(e.data);
-    toast('🛡 '+d.completedBy+' completou "'+d.missionName+'"! +'+d.xp.toLocaleString()+' XP, +'+d.gold.toLocaleString()+' ouro ('+d.totalMembers+' membros)', 'good');
-    addLog('🛡 Clã "'+d.missionName+'": +'+d.xp+' XP, +'+d.gold+' ouro (1/'+d.totalMembers+')', 'good');
-    // Reload to apply XP/gold
-    api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState; updateUI();} });
+    if (d.levelsGained > 0) {
+      toast('🎉 LEVEL UP! Você é agora Nível ' + d.newLevel + '!', 'good');
+      addLog('🎉 LEVEL UP! Nível ' + d.newLevel, 'good');
+    }
+    toast('🛡 ' + d.completedBy + ' completou "' + d.missionName + '"! +' + (d.xp||0).toLocaleString() + ' XP, +' + (d.gold||0).toLocaleString() + ' ouro (' + d.totalMembers + ' membros)', 'good');
+    addLog('🛡 Clã "' + d.missionName + '": +' + d.xp + ' XP, +' + d.gold + ' ouro (1/' + d.totalMembers + ')', 'good');
+    api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
   });
 }
 
@@ -7190,15 +7230,16 @@ function registerTavernSSEHandlers() {
     const hudStam = document.getElementById('hud-stam-bar');
     const hudHpLbl  = document.getElementById('hud-hp-label');
     const hudStamLbl= document.getElementById('hud-stam-label');
+    const _regenEff = getEffectiveStats();
     const pct = (v, mx) => Math.round(Math.max(0, Math.min(100, v/mx*100))) + '%';
-    if (hpBar)    hpBar.style.width    = pct(G.hp, G.hpMax);
-    if (hpTxt)    hpTxt.textContent    = G.hp + ' / ' + G.hpMax;
-    if (stamBar)  stamBar.style.width  = pct(G.stam, d.stamMax);
-    if (stamTxt)  stamTxt.textContent  = G.stam + ' / ' + d.stamMax;
-    if (hudHp)    hudHp.style.width    = pct(G.hp, G.hpMax);
-    if (hudStam)  hudStam.style.width  = pct(G.stam, d.stamMax);
-    if (hudHpLbl)   hudHpLbl.textContent   = G.hp  + '/' + G.hpMax;
-    if (hudStamLbl) hudStamLbl.textContent = G.stam + '/' + d.stamMax;
+    if (hpBar)    hpBar.style.width    = pct(G.hp,   _regenEff.hpMax);
+    if (hpTxt)    hpTxt.textContent    = G.hp   + ' / ' + _regenEff.hpMax;
+    if (stamBar)  stamBar.style.width  = pct(G.stam, _regenEff.stamMax);
+    if (stamTxt)  stamTxt.textContent  = G.stam + ' / ' + _regenEff.stamMax;
+    if (hudHp)    hudHp.style.width    = pct(G.hp,   _regenEff.hpMax);
+    if (hudStam)  hudStam.style.width  = pct(G.stam, _regenEff.stamMax);
+    if (hudHpLbl)   hudHpLbl.textContent   = G.hp   + '/' + _regenEff.hpMax;
+    if (hudStamLbl) hudStamLbl.textContent = G.stam + '/' + _regenEff.stamMax;
     // Subtle notification if HP was very low before
     if (d.hp > 0 && (d.hp - 10) <= 0) {
       toast('❤️ +10 HP regenerado passivamente', 'info');
@@ -7581,10 +7622,15 @@ function registerPartySSEHandlers() {
 
   sseConn.addEventListener('party_reward', e => {
     const d = JSON.parse(e.data);
-    toast('🤝 Party '+d.missionName+': +'+d.xp+' XP, +'+d.gold+' ouro ('+d.pct+'%)','good');
-    addLog('🤝 Party "'+d.missionName+'": +'+d.xp+' XP, +'+d.gold+' ouro ('+d.pct+'%)', 'good');
-    // Reload state to reflect XP/gold gain
-    api('GET','/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
+    // Level up notification
+    if (d.levelsGained > 0) {
+      toast('🎉 LEVEL UP! Você é agora Nível ' + d.newLevel + '!', 'good');
+      addLog('🎉 LEVEL UP x' + d.levelsGained + '! Nível ' + d.newLevel + '!', 'good');
+    }
+    toast('🤝 Party "' + d.missionName + '": +' + d.xp + ' XP, +' + d.gold + ' ouro (' + d.pct + '%)', 'good');
+    addLog('🤝 Party "' + d.missionName + '": +' + d.xp + ' XP, +' + d.gold + ' ouro (' + d.pct + '%)', 'good');
+    // Reload full state — server already applied level up
+    api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
   });
 }
 
@@ -7939,6 +7985,23 @@ async function loadServerAssassin() {
   if (res.error) return;
   _serverAssassin = res.assassin; // null or { username, name, kills, race }
   updateUI(); // refresh rank/hud if needed
+}
+
+function registerAdminSSEHandlers() {
+  if (!sseConn) return;
+  sseConn.addEventListener('admin_edit', e => {
+    const d = JSON.parse(e.data);
+    toast('👑 ' + (d.msg || 'Personagem atualizado pelo administrador!'), 'good');
+    addLog('👑 Admin: ' + (d.msg || 'Personagem editado.'), 'info');
+    // Reload full game state
+    api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
+  });
+  sseConn.addEventListener('admin_ban', e => {
+    const d = JSON.parse(e.data);
+    showModal('⚠️ Conta Suspensa', d.msg || 'Sua conta foi suspensa.', [
+      { label: 'OK', fn: () => { logout(); } }
+    ]);
+  });
 }
 
 function registerAssassinSSEHandlers() {
