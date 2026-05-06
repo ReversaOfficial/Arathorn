@@ -271,6 +271,237 @@ function makeManualBackup() {
   return makeBackup('manual');
 }
 
+
+// ─── PASSIVE REGENERATION ────────────────────────────────────────────────────
+// Every 5 minutes: all characters regen 10 HP + 5 stamina
+// Works for ALL players, online or offline
+// Does NOT regen if player is in infirmary (knockedOutUntil > now)
+// ─────────────────────────────────────────────────────────────────────────────
+function runPassiveRegen() {
+  const db = loadDB();
+  let regenCount = 0;
+  const HP_REGEN   = 10;
+  const STAM_REGEN = 5;
+
+  Object.entries(db.users).forEach(([username, user]) => {
+    const g = user.gameState;
+    if (!g) return;
+
+    // Skip if in infirmary — KO players don't regen
+    if (g.knockedOutUntil && g.knockedOutUntil > Date.now()) return;
+
+    // ── Determine true caps ──────────────────────────────────────────────
+    // HP cap = g.hpMax (set on level up, includes base class gains)
+    // NEVER exceed what the character actually has as max
+    const trueHpMax = Math.max(1, g.hpMax || 90);
+
+    // Stam cap = g.stamMax + necklace bonus (if equipped)
+    // g.stamMax is the BASE max (no item bonuses)
+    const hasStamNeck = Object.values(g.equipment || {})
+      .some(eId => eId && eId.replace('!lucky','').split('+')[0] === 'neck_endurance');
+    const trueStamMax = Math.max(1, (g.stamMax || 10)) + (hasStamNeck ? 10 : 0);
+
+    let changed = false;
+
+    // HP regen — never exceed trueHpMax
+    if ((g.hp || 0) < trueHpMax) {
+      const before = g.hp;
+      g.hp = Math.min(trueHpMax, (g.hp || 0) + HP_REGEN);
+      if (g.hp !== before) changed = true;
+    }
+
+    // Stam regen — never exceed trueStamMax
+    if ((g.stam || 0) < trueStamMax) {
+      const before = g.stam;
+      g.stam = Math.min(trueStamMax, (g.stam || 0) + STAM_REGEN);
+      if (g.stam !== before) changed = true;
+    }
+
+    if (changed) {
+      regenCount++;
+      if (onlineMap.has(username)) {
+        sendSSE(username, 'passive_regen', {
+          hp: g.hp, hpMax: trueHpMax,
+          stam: g.stam, stamMax: trueStamMax
+        });
+      }
+    }
+  });
+
+  if (regenCount > 0) {
+    saveDB(db);
+    console.log('[REGEN] +' + HP_REGEN + 'HP +' + STAM_REGEN + 'Stam para ' + regenCount + ' personagem(ns)');
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SERVER ASSASSIN SYSTEM
+// Player with most PvP wins gets title 💀 Assassino do Servidor
+// Bonus: +100 hpMax, +30 str, +30 dex, +30 mag, +30 res
+// Automatically transfers when someone surpasses the current holder
+// ═══════════════════════════════════════════════════════════════════════════
+const ASSASSIN_BONUS = { hpMax: 100, str: 30, dex: 30, mag: 30, res: 30 };
+
+function checkServerAssassin(db) {
+  if (!db.globalStats) db.globalStats = {};
+
+  // Find player with most pvpWins across ALL users
+  let topUsername = null;
+  let topKills    = 0;
+
+  Object.entries(db.users).forEach(([u, d]) => {
+    const g = d.gameState;
+    if (!g) return;
+    const kills = (g.stats && g.stats.pvpWins) || 0;
+    if (kills > topKills || (kills === topKills && u < (topUsername||'z'))) {
+      topKills    = kills;
+      topUsername = u;
+    }
+  });
+
+  // No one has kills yet
+  if (!topUsername || topKills === 0) return;
+
+  const current = db.globalStats.serverAssassin; // { username, kills }
+
+  // No change needed
+  if (current && current.username === topUsername && current.kills === topKills) return;
+
+  // ── Remove bonus from old assassin ────────────────────────────────────────
+  if (current && current.username && current.username !== topUsername) {
+    const oldUser = db.users[current.username];
+    if (oldUser && oldUser.gameState) {
+      const og = oldUser.gameState;
+      og.hpMax  = Math.max(1,  (og.hpMax||90)  - ASSASSIN_BONUS.hpMax);
+      og.hp     = Math.min(og.hp||1, og.hpMax);
+      og.str    = Math.max(1,  (og.str||10)    - ASSASSIN_BONUS.str);
+      og.dex    = Math.max(1,  (og.dex||10)    - ASSASSIN_BONUS.dex);
+      og.mag    = Math.max(1,  (og.mag||10)    - ASSASSIN_BONUS.mag);
+      og.res    = Math.max(1,  (og.res||10)    - ASSASSIN_BONUS.res);
+      og.isServerAssassin = false;
+      if (!og.log) og.log = [];
+      og.log.unshift({ msg: '💀 Perdeu o título de Assassino do Servidor para '+
+        (db.users[topUsername]&&db.users[topUsername].gameState&&db.users[topUsername].gameState.name||topUsername)+
+        '! Bônus removidos.', cls:'bad' });
+      sendSSE(current.username, 'server_assassin_changed', {
+        newAssassin: db.users[topUsername]&&db.users[topUsername].gameState&&db.users[topUsername].gameState.name||topUsername,
+        newKills: topKills,
+        lost: true
+      });
+    }
+  }
+
+  // ── Apply bonus to new assassin ───────────────────────────────────────────
+  const newUser = db.users[topUsername];
+  if (newUser && newUser.gameState) {
+    const ng = newUser.gameState;
+    const wasAlready = ng.isServerAssassin;
+    if (!wasAlready) {
+      ng.hpMax  = (ng.hpMax||90)  + ASSASSIN_BONUS.hpMax;
+      ng.str    = (ng.str||10)    + ASSASSIN_BONUS.str;
+      ng.dex    = (ng.dex||10)    + ASSASSIN_BONUS.dex;
+      ng.mag    = (ng.mag||10)    + ASSASSIN_BONUS.mag;
+      ng.res    = (ng.res||10)    + ASSASSIN_BONUS.res;
+      ng.isServerAssassin = true;
+      if (!ng.log) ng.log = [];
+      ng.log.unshift({ msg: '💀 Você é o Assassino do Servidor! +100 HP, +30 em todos os atributos!', cls:'good' });
+      sendSSE(topUsername, 'server_assassin_changed', {
+        newAssassin: ng.name,
+        newKills: topKills,
+        gained: true,
+        bonus: ASSASSIN_BONUS
+      });
+    }
+  }
+
+  // Update global record
+  db.globalStats.serverAssassin = { username: topUsername, kills: topKills };
+
+  // Broadcast to all online players
+  broadcastSSE('server_assassin_update', {
+    username: topUsername,
+    name: newUser&&newUser.gameState ? newUser.gameState.name : topUsername,
+    kills: topKills
+  });
+
+  console.log('[ASSASSIN] Novo Assassino do Servidor:', topUsername, '('+topKills+' kills)');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA MIGRATION — Runs on startup, safe to run multiple times
+// Adds missing fields to existing players without touching existing data
+// ═══════════════════════════════════════════════════════════════════════════
+function runMigrations() {
+  const db = loadDB();
+  let migrated = 0;
+
+  Object.entries(db.users).forEach(([username, user]) => {
+    const g = user.gameState;
+    if (!g) return;
+    let changed = false;
+
+    // Ensure all required fields exist (never overwrites existing values)
+    const defaults = {
+      stats:        { missions:0, kills:0, pvpWins:0, pvpLosses:0, crimes:0 },
+      equipment:    {},
+      inventory:    [],
+      consumables:  [],
+      log:          [],
+      friends:      [],
+      buffs:        [],
+      xpBonus:      0,
+      vipUntil:     0,
+      knockedOutUntil: 0,
+      jailUntil:    0,
+      isServerAssassin: false,
+      clanWins:     0,
+      clanGold:     0,
+    };
+
+    Object.entries(defaults).forEach(([key, val]) => {
+      if (g[key] === undefined || g[key] === null) {
+        g[key] = typeof val === 'object' && !Array.isArray(val)
+          ? Object.assign({}, val)
+          : Array.isArray(val) ? [] : val;
+        changed = true;
+      }
+    });
+
+    // Ensure stats sub-fields exist
+    if (g.stats) {
+      ['missions','kills','pvpWins','pvpLosses','crimes'].forEach(k => {
+        if (g.stats[k] === undefined) { g.stats[k] = 0; changed = true; }
+      });
+    }
+
+    // Ensure hpMax is set
+    if (!g.hpMax || g.hpMax < g.hp) {
+      g.hpMax = Math.max(g.hp || 90, g.hpMax || 90);
+      changed = true;
+    }
+    // Ensure stamMax is set
+    if (!g.stamMax) {
+      g.stamMax = 10;
+      changed = true;
+    }
+    // Ensure hp is not negative
+    if (g.hp < 0) { g.hp = 1; changed = true; }
+    // Ensure stam is not negative
+    if (g.stam < 0) { g.stam = 0; changed = true; }
+
+    if (changed) migrated++;
+  });
+
+  if (migrated > 0) {
+    saveDB(db);
+    console.log('[MIGRATION] Updated ' + migrated + ' player(s) with missing fields.');
+  } else {
+    console.log('[MIGRATION] All players up to date.');
+  }
+}
+
 function sendFile(res, fp, ct) {
   try { const d = fs.readFileSync(fp); res.writeHead(200, { 'Content-Type': ct }); res.end(d); }
   catch(e) { res.writeHead(404); res.end('Not found'); }
@@ -328,7 +559,14 @@ function applyShopRewards(g, rewards) {
     const now = Date.now();
     const current = g.vipUntil || now;
     g.vipUntil = Math.max(current, now) + rewards.vipDays * 24 * 60 * 60 * 1000;
-    g.xpBonus = (g.xpBonus||0); // VIP XP bonus applied in gainXP check
+  }
+  // Emergency releases
+  if (rewards.jailRelease) {
+    g.jailUntil = 0;
+  }
+  if (rewards.infirmaryRelease) {
+    g.knockedOutUntil = 0;
+    if (rewards.hpFull) g.hp = g.hpMax;
   }
   if (rewards.log) {
     if (!g.log) g.log = [];
@@ -439,74 +677,98 @@ async function handleRequest(req, res) {
 
     const existing = db.users[username].gameState;
     if (existing) {
-      // ── ANTI-CHEAT VALIDATION ──────────────────────────────────────────
-      // Prevent obvious tampering: gold, level, stats can never DECREASE drastically
-      // unless the server explicitly approved it (via mission/duel/etc routes).
+      // ── ANTI-CHEAT — LOG ONLY MODE ──────────────────────────────────────
+      // Strategy: NEVER silently revert legitimate player progress.
+      // Log suspicious values for admin review, but ALWAYS save what the
+      // client sends — except for clear impossible values (negative, Infinity).
+      // Reason: false positives (VIP bonuses, level-up chains, PvP stat gains)
+      // are worse than the occasional cheater during beta.
 
-      // Cap level changes — client cannot self-promote
-      const oldLevel = existing.level || 1;
-      const newLevel = safeNumber(gameState.level, 1, 999);
-      if (newLevel - oldLevel > 5) {
-        // Suspicious — allow only +5 levels per save (covers natural level-ups)
-        gameState.level = oldLevel;
-      } else {
-        gameState.level = newLevel;
-      }
-
-      // Cap individual stats — anti gold/stat injection
-      gameState.gold = safeNumber(gameState.gold, 0, 999999999999);
-      gameState.str  = safeNumber(gameState.str,  1, 99999);
-      gameState.dex  = safeNumber(gameState.dex,  1, 99999);
-      gameState.mag  = safeNumber(gameState.mag,  1, 99999);
-      gameState.res  = safeNumber(gameState.res,  1, 99999);
-      gameState.hp   = safeNumber(gameState.hp,   0, 999999);
-      gameState.mana = safeNumber(gameState.mana, 0, 999999);
-      gameState.stam = safeNumber(gameState.stam, 0, 999);
+      // ── HARD CAPS — absolute impossibles (not reversions) ──────────────
+      gameState.level = safeNumber(gameState.level, 1, 999);
+      gameState.gold  = safeNumber(gameState.gold,  0, 999999999999);
+      gameState.str   = safeNumber(gameState.str,   1, 99999);
+      gameState.dex   = safeNumber(gameState.dex,   1, 99999);
+      gameState.mag   = safeNumber(gameState.mag,   1, 99999);
+      gameState.res   = safeNumber(gameState.res,   1, 99999);
+      gameState.hp    = safeNumber(gameState.hp,    0, 999999);
+      gameState.mana  = safeNumber(gameState.mana,  0, 999999);
+      gameState.stam  = safeNumber(gameState.stam,  0, 999);
       gameState.hpMax   = safeNumber(gameState.hpMax,   1, 999999);
       gameState.manaMax = safeNumber(gameState.manaMax, 1, 999999);
       gameState.stamMax = safeNumber(gameState.stamMax, 1, 999);
       gameState.xp      = safeNumber(gameState.xp, 0, Number.MAX_SAFE_INTEGER);
 
-      // Suspicious gold jump: client cant gain >10M gold per save unless legit (raids)
-      const oldGold = existing.gold || 0;
-      if (gameState.gold - oldGold > 10000000) {
-        // Flag for monitoring — keep old value
-        gameState.gold = oldGold;
-        console.warn('[ANTI-CHEAT] Suspicious gold jump for ' + username + ': ' + oldGold + ' -> ' + gameState.gold);
+      // ── MONITOR ONLY — log suspicious jumps but NEVER block saves ──────
+      const oldLevel = existing.level || 1;
+      const oldGold  = existing.gold  || 0;
+      if (gameState.level - oldLevel > 30) {
+        console.warn('[MONITOR] Large level jump: ' + username + ' ' + oldLevel + '->' + gameState.level);
       }
-
-      // Cap stats jumps too (per save) — prevents instant max stats
+      if (gameState.gold - oldGold > 50000000) {
+        console.warn('[MONITOR] Large gold jump: ' + username + ' +' + (gameState.gold-oldGold));
+      }
       ['str','dex','mag','res'].forEach(s => {
         const oldS = existing[s] || 1;
-        if (gameState[s] - oldS > 50) {
-          gameState[s] = oldS;
-          console.warn('[ANTI-CHEAT] Suspicious '+s+' jump for ' + username);
+        if (gameState[s] - oldS > 500) {
+          console.warn('[MONITOR] Large '+s+' jump: '+username+' +' + (gameState[s]-oldS));
         }
       });
 
-      // String fields — sanitize to prevent XSS
-      if (typeof gameState.name === 'string')     gameState.name = safeString(gameState.name, 28);
-      if (typeof gameState.clanName === 'string') gameState.clanName = safeString(gameState.clanName, 30);
-      if (typeof gameState.clanTag === 'string')  gameState.clanTag = safeString(gameState.clanTag, 5);
+      // ── PROTECT EXISTING PROGRESS — never allow values to drop below saved ──
+      // This prevents a client bug from wiping XP, gold or level earned on server
+      gameState.xp    = Math.max(existing.xp    || 0, gameState.xp);
+      gameState.level = Math.max(existing.level  || 1, gameState.level);
+      // Gold: allow decreases (spending), but not below 0
+      gameState.gold  = Math.max(0, gameState.gold);
 
-      // Inventory size cap (prevent DoS via unbounded array)
-      if (Array.isArray(gameState.inventory) && gameState.inventory.length > 500) {
-        gameState.inventory = gameState.inventory.slice(0, 500);
+      // ── PROTECT SERVER-MANAGED FIELDS — client cannot overwrite these ──
+      // Clan role/name set by server routes only (not saveable by client)
+      if (existing.clanName !== undefined) {
+        gameState.clanName = existing.clanName;
+        gameState.clanTag  = existing.clanTag;
+        gameState.clanRole = existing.clanRole;
       }
-      if (Array.isArray(gameState.consumables) && gameState.consumables.length > 200) {
-        gameState.consumables = gameState.consumables.slice(0, 200);
+      // Server assassin title — client can't self-assign
+      if (!existing.isServerAssassin) {
+        gameState.isServerAssassin = false;
       }
-      if (Array.isArray(gameState.log) && gameState.log.length > 100) {
-        gameState.log = gameState.log.slice(0, 100);
+      // Jail/infirmary — client can't clear these (only server routes can)
+      if (existing.jailUntil && existing.jailUntil > Date.now()) {
+        gameState.jailUntil = existing.jailUntil;
       }
+      if (existing.knockedOutUntil && existing.knockedOutUntil > Date.now()) {
+        gameState.knockedOutUntil = existing.knockedOutUntil;
+      }
+      // VIP — client can't self-extend
+      if (!existing.vipUntil || existing.vipUntil <= Date.now()) {
+        // VIP expired or never had — allow what client sends (30min free grant)
+        // but cap at 30 min if no payment
+        if (gameState.vipUntil && gameState.vipUntil > Date.now() + 31*60*1000) {
+          gameState.vipUntil = existing.vipUntil || 0; // revert unauthorized extension
+        }
+      } else {
+        // Active VIP — keep whichever is later (don't reduce paid VIP)
+        gameState.vipUntil = Math.max(existing.vipUntil, gameState.vipUntil || 0);
+      }
+
+      // ── STRING SANITIZATION ─────────────────────────────────────────────
+      if (typeof gameState.name === 'string') gameState.name = safeString(gameState.name, 28);
+      else gameState.name = existing.name || 'Herói';
+
+      // ── ARRAY SIZE CAPS (DoS protection only) ──────────────────────────
+      if (Array.isArray(gameState.inventory)   && gameState.inventory.length   > 500) gameState.inventory   = gameState.inventory.slice(0, 500);
+      if (Array.isArray(gameState.consumables) && gameState.consumables.length > 200) gameState.consumables = gameState.consumables.slice(0, 200);
+      if (Array.isArray(gameState.log)         && gameState.log.length         > 100) gameState.log         = gameState.log.slice(0, 100);
+
     } else {
-      // First save (character creation) — basic validation only
+      // ── FIRST SAVE (character creation) ────────────────────────────────
       gameState.level = 1;
-      gameState.gold  = safeNumber(gameState.gold, 0, 1000); // starting gold cap
+      gameState.gold  = safeNumber(gameState.gold, 0, 5000); // allow free VIP starting bonus
       gameState.xp    = 0;
       if (typeof gameState.name === 'string') gameState.name = safeString(gameState.name, 28);
       else { send(res, 400, { error: 'Nome invalido.' }); return; }
-      // Block clan privileges on creation
+      // Block clan on creation
       gameState.clanName = null;
       gameState.clanTag  = null;
       gameState.clanRole = 'member';
@@ -635,6 +897,8 @@ async function handleRequest(req, res) {
     duel.winnerName = wg.name; duel.loserName = lg.name;
     duel.winnerPower = cWins ? cP : tP; duel.loserPower = cWins ? tP : cP;
     duel.goldStolen = goldStolen; duel.resolvedAt = Date.now();
+    // Check server assassin title
+    checkServerAssassin(db);
     saveDB(db);
     broadcastSSE('duel_update', { duel });
     send(res, 200, { ok: true, duel });
@@ -1363,6 +1627,8 @@ async function handleRequest(req, res) {
     if (!loseG.log) loseG.log=[];
     loseG.log.unshift({msg:'💀 Duelo na Taverna: perdeu para '+winG.name+'. -10 '+loseStat.toUpperCase()+'. Enfermaria 10min.', cls:'bad'});
 
+    // Check server assassin title after every kill
+    checkServerAssassin(db);
     saveDB(db);
     // Notify both via SSE
     sendSSE(winner,'tavern_duel_result',{result:'win', vs:loseG.name, stat:winStat, power:{mine:myPower,theirs:hisPower}});
@@ -1990,18 +2256,18 @@ async function handleRequest(req, res) {
     'vip_30': {
       id: 'vip_30',
       name: '👑 VIP — 30 dias',
-      desc: '+50% XP em todas missões · +25% ouro · Badge VIP dourado · Missões exclusivas',
-      price: 19.90,
+      desc: '+10% XP · +10% drop de itens · +10 Estamina · +5 status/nível · Ícone VIP dourado',
+      price: 9.90,
       type: 'vip',
-      rewards: { vipDays: 30, log: '👑 VIP ativado por 30 dias! Aproveite os bônus!' }
+      rewards: { vipDays: 30, log: '👑 VIP 30 dias ativado! Bônus aplicados ao seu personagem!' }
     },
     'vip_90': {
       id: 'vip_90',
       name: '👑👑 VIP — 90 dias',
-      desc: '+50% XP · +25% ouro · Badge especial · Preço com 33% de desconto',
-      price: 39.90,
+      desc: '+10% XP · +10% drop · +10 Estamina · +5 status/nível · Desconto especial 3 meses',
+      price: 24.90,
       type: 'vip',
-      rewards: { vipDays: 90, log: '👑 VIP ativado por 90 dias! Boa jornada, herói!' }
+      rewards: { vipDays: 90, log: '👑 VIP 90 dias ativado! Boa jornada, herói!' }
     },
     'pedras_prist': {
       id: 'pedras_prist',
@@ -2023,6 +2289,29 @@ async function handleRequest(req, res) {
       rewards: {
         consumables: ['ravika_s','ravika_s','ravika_s','ravika_s','ravika_s'],
         log: '🌑 5 Pedras Ravika adicionadas ao inventário!'
+      }
+    },
+    'bail_pix': {
+      id: 'bail_pix',
+      name: '⚖️ Fiança — Sair da Cadeia',
+      desc: 'Pague via PIX e saia da prisão imediatamente, sem esperar!',
+      price: 2.99,
+      type: 'emergency',
+      rewards: {
+        jailRelease: true,
+        log: '⚖️ Fiança paga via PIX! Você foi solto imediatamente.'
+      }
+    },
+    'revive_pix': {
+      id: 'revive_pix',
+      name: '💊 Cura — Sair da Enfermaria',
+      desc: 'Pague via PIX e saia da enfermaria curado na hora!',
+      price: 2.99,
+      type: 'emergency',
+      rewards: {
+        infirmaryRelease: true,
+        hpFull: true,
+        log: '💊 Cura paga via PIX! Você foi curado e saiu da enfermaria!'
       }
     },
   };
@@ -2319,6 +2608,440 @@ async function handleRequest(req, res) {
     send(res,200,{ok:true}); return;
   }
 
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CRIME SYSTEM — Global counter, every 11th crime gets caught
+  // ═══════════════════════════════════════════════════════════════════════
+  if (method === 'POST' && url === '/api/crime/commit') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+
+    // Check if already in jail
+    if (g.jailUntil && g.jailUntil > Date.now()) {
+      send(res,400,{error:'Voce esta preso! Pague a fianca ou aguarde.'}); return;
+    }
+    // Check if KO
+    if (g.knockedOutUntil && g.knockedOutUntil > Date.now()) {
+      send(res,400,{error:'Voce esta na enfermaria!'}); return;
+    }
+
+    // Global crime counter
+    if (!db.globalStats) db.globalStats = { totalMissions:0, totalCrimes:0 };
+    if (!db.globalStats.totalCrimes) db.globalStats.totalCrimes = 0;
+    db.globalStats.totalCrimes++;
+    const crimeNum = db.globalStats.totalCrimes;
+
+    // Every 11th crime server-wide: this criminal gets caught!
+    const caughtByCounter = (crimeNum % 11 === 0);
+
+    saveDB(db);
+    send(res, 200, { ok: true, crimeNum, caughtByCounter });
+    return;
+  }
+
+  // Pay bail (gold)
+  if (method === 'POST' && url === '/api/crime/bail') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+    if (!g.jailUntil || g.jailUntil <= Date.now()) { send(res,400,{error:'Voce nao esta preso.'}); return; }
+    const BAIL_COST = 10000;
+    if ((g.gold||0) < BAIL_COST) { send(res,400,{error:'Precisa de 10.000 ouro para pagar a fianca.'}); return; }
+    g.gold -= BAIL_COST;
+    g.jailUntil = 0;
+    if (!g.log) g.log=[];
+    g.log.unshift({msg:'⚖️ Pagou 10.000 ouro de fiança e saiu da cadeia!', cls:'info'});
+    saveDB(db);
+    send(res, 200, { ok:true, newBalance: g.gold });
+    return;
+  }
+
+
+  // Leader invites a specific player to clan from profile modal
+  if (method === 'POST' && url === '/api/clan/request-invite') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const { targetUsername } = await readBody(req);
+    const target = (targetUsername||'').toLowerCase();
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState||user.gameState.clanRole!=='leader') {
+      send(res,403,{error:'Apenas lideres podem convidar.'}); return;
+    }
+    const tUser = db.users[target];
+    if (!tUser||!tUser.gameState) { send(res,404,{error:'Jogador nao encontrado.'}); return; }
+    const clanName = user.gameState.clanName;
+    if (tUser.gameState.clanName === clanName) { send(res,409,{error:'Jogador ja e membro do cla.'}); return; }
+    if (!db.clanRequests) db.clanRequests = {};
+    if (!db.clanRequests[clanName]) db.clanRequests[clanName] = [];
+    // Check if already has pending request
+    if (db.clanRequests[clanName].find(r=>r.username===target)) {
+      send(res,409,{error:'Solicitacao ja existe para este jogador.'}); return;
+    }
+    // Add as a pre-approved invite (the target just needs to accept)
+    const g = tUser.gameState;
+    db.clanRequests[clanName].push({
+      username: target, name: g.name, race: g.race, level: g.level, ts: Date.now(), invited: true
+    });
+    saveDB(db);
+    // Notify target via SSE
+    sendSSE(target, 'clan_join_request', {
+      applicant: g.name, username: target, clanName,
+      fromLeader: user.gameState.name, isInvite: true
+    });
+    send(res,200,{ok:true});
+    return;
+  }
+
+
+  // Get current server assassin info
+  if (method === 'GET' && url === '/api/global/assassin') {
+    const db = loadDB();
+    const a = db.globalStats && db.globalStats.serverAssassin;
+    if (!a) { send(res, 200, { assassin: null }); return; }
+    const user = db.users[a.username];
+    const name = user && user.gameState ? user.gameState.name : a.username;
+    const race = user && user.gameState ? user.gameState.race : 'humano';
+    send(res, 200, { assassin: { username: a.username, name, kills: a.kills, race } });
+    return;
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SISTEMA DE RAID — Clan raids 2~5 jogadores vs Boss
+  // Cooldown 2h por jogador por raid
+  // Drops divididos igualmente
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const RAID_CATALOG = {
+    'raid_duo': {
+      id:'raid_duo', slots:2, minLv:10,
+      boss:{ name:'Trollano, o Devorador', icon:'👹', hp:8000, atk:180, desc:'Um troll ancião que habita as cavernas do Norte.' },
+      gold:[3000,6000], xp:[2500,5000], stam:3,
+      drops:['prist_s','prist_s','prist_s','ravika_s'],
+      bonusDrop:{ item:'r1', chance:0.30 }, // 30% chance of ring drop
+      cooldownMs: 2*60*60*1000
+    },
+    'raid_trio': {
+      id:'raid_trio', slots:3, minLv:30,
+      boss:{ name:'Vorgath, o Destruidor', icon:'🐲', hp:22000, atk:320, desc:'Dragão corrompido pelo Olho de Sauron.' },
+      gold:[12000,25000], xp:[10000,20000], stam:4,
+      drops:['prist_s','prist_m','ravika_s','ravika_s'],
+      bonusDrop:{ item:'re2', chance:0.25 },
+      cooldownMs: 2*60*60*1000
+    },
+    'raid_squad': {
+      id:'raid_squad', slots:4, minLv:60,
+      boss:{ name:'Molkrath, o Imortal', icon:'💀', hp:55000, atk:580, desc:'Lich Supremo que comanda legiões de mortos-vivos.' },
+      gold:[40000,80000], xp:[35000,65000], stam:5,
+      drops:['prist_m','prist_m','ravika_s','ravika_m'],
+      bonusDrop:{ item:'ran3', chance:0.20 },
+      cooldownMs: 2*60*60*1000
+    },
+    'raid_full': {
+      id:'raid_full', slots:5, minLv:100,
+      boss:{ name:'Zar\'oth, o Deus Proibido', icon:'🌑', hp:140000, atk:1200, desc:'Entidade primordial banida para além do véu da realidade.' },
+      gold:[120000,250000], xp:[100000,200000], stam:6,
+      drops:['ravika_m','ravika_m','prist_m','prist_m','prist_m'],
+      bonusDrop:{ item:'ew3_epc', chance:0.15 },
+      cooldownMs: 2*60*60*1000
+    },
+  };
+
+  // POST /api/raid/create — clan leader opens a raid room
+  if (method === 'POST' && url === '/api/raid/create') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { raidId } = await readBody(req);
+    const raid = RAID_CATALOG[raidId];
+    if (!raid) { send(res,400,{error:'Raid nao encontrada.'}); return; }
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+    if (!g.clanName) { send(res,400,{error:'Precisa de um cla para abrir raids.'}); return; }
+    if (g.clanRole !== 'leader') { send(res,403,{error:'Apenas lideres de cla podem convocar raids.'}); return; }
+    if (g.level < raid.minLv) { send(res,400,{error:'Nivel '+raid.minLv+' necessario para esta raid.'}); return; }
+    // Check cooldown
+    const coolKey = username+'_'+raidId;
+    if (!db.raidCooldowns) db.raidCooldowns = {};
+    const lastRun = db.raidCooldowns[coolKey] || 0;
+    if (Date.now() - lastRun < raid.cooldownMs) {
+      const rem = Math.ceil((raid.cooldownMs - (Date.now()-lastRun)) / 60000);
+      send(res,429,{error:'Cooldown ativo. Disponivel em '+rem+' minutos.'}); return;
+    }
+    // Create raid room
+    if (!db.raidRooms) db.raidRooms = {};
+    const roomId = 'raid_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    db.raidRooms[roomId] = {
+      id: roomId, raidId, clanName: g.clanName,
+      leader: username, leaderName: g.name,
+      members: [{ username, name: g.name, race: g.race, level: g.level }],
+      maxSlots: raid.slots, status: 'waiting',
+      createdAt: Date.now(), expiresAt: Date.now() + 10*60*1000 // 10min to fill
+    };
+    saveDB(db);
+    // Notify all online clan members
+    Object.entries(db.users).forEach(([u, d]) => {
+      if (u === username) return;
+      if (!d.gameState || d.gameState.clanName !== g.clanName) return;
+      if (!onlineMap.has(u)) return;
+      sendSSE(u, 'raid_invite', { roomId, raidId, leaderName: g.name, bossName: raid.boss.name, bossIcon: raid.boss.icon, slots: raid.slots, minLv: raid.minLv });
+    });
+    send(res,200,{ok:true, roomId, raid: { boss: raid.boss, slots: raid.slots, gold: raid.gold, xp: raid.xp }}); return;
+  }
+
+  // POST /api/raid/join — member joins raid room
+  if (method === 'POST' && url === '/api/raid/join') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { roomId } = await readBody(req);
+    const db = loadDB();
+    if (!db.raidRooms||!db.raidRooms[roomId]) { send(res,404,{error:'Sala de raid nao encontrada.'}); return; }
+    const room = db.raidRooms[roomId];
+    if (room.status !== 'waiting') { send(res,400,{error:'Esta raid ja iniciou ou encerrou.'}); return; }
+    if (room.expiresAt < Date.now()) { send(res,400,{error:'Convite expirado.'}); return; }
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+    if (g.clanName !== room.clanName) { send(res,403,{error:'Voce nao pertence ao cla desta raid.'}); return; }
+    const raidDef = RAID_CATALOG[room.raidId];
+    if (g.level < raidDef.minLv) { send(res,400,{error:'Nivel '+raidDef.minLv+' necessario.'}); return; }
+    if (room.members.find(m=>m.username===username)) { send(res,409,{error:'Voce ja esta nesta raid.'}); return; }
+    if (room.members.length >= room.maxSlots) { send(res,400,{error:'Raid cheia ('+room.maxSlots+' jogadores max).'}); return; }
+    // Check cooldown
+    if (!db.raidCooldowns) db.raidCooldowns = {};
+    const coolKey = username+'_'+room.raidId;
+    const lastRun = db.raidCooldowns[coolKey] || 0;
+    if (Date.now() - lastRun < raidDef.cooldownMs) {
+      const rem = Math.ceil((raidDef.cooldownMs-(Date.now()-lastRun))/60000);
+      send(res,429,{error:'Cooldown ativo. Disponivel em '+rem+' min.'}); return;
+    }
+    room.members.push({ username, name: g.name, race: g.race, level: g.level });
+    saveDB(db);
+    // Notify room members
+    room.members.forEach(m => sendSSE(m.username,'raid_room_update',{ room, raidDef: { boss: raidDef.boss, slots: raidDef.slots, gold: raidDef.gold, xp: raidDef.xp, minLv: raidDef.minLv } }));
+    send(res,200,{ok:true, room}); return;
+  }
+
+  // GET /api/raid/room/:roomId — get room state
+  if (method === 'GET' && url.startsWith('/api/raid/room/')) {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const roomId = url.slice('/api/raid/room/'.length);
+    const db = loadDB();
+    const room = db.raidRooms&&db.raidRooms[roomId];
+    if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
+    const raidDef = RAID_CATALOG[room.raidId];
+    send(res,200,{ room, raidDef: raidDef ? { boss: raidDef.boss, slots: raidDef.slots, gold: raidDef.gold, xp: raidDef.xp, minLv: raidDef.minLv } : null }); return;
+  }
+
+  // POST /api/raid/start — leader starts when room is ready
+  if (method === 'POST' && url === '/api/raid/start') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { roomId } = await readBody(req);
+    const db = loadDB();
+    const room = db.raidRooms&&db.raidRooms[roomId];
+    if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
+    if (room.leader !== username) { send(res,403,{error:'Apenas o lider pode iniciar.'}); return; }
+    if (room.status !== 'waiting') { send(res,400,{error:'Raid ja iniciada.'}); return; }
+    if (room.members.length < 2) { send(res,400,{error:'Precisa de pelo menos 2 jogadores.'}); return; }
+    const raidDef = RAID_CATALOG[room.raidId];
+    if (!raidDef) { send(res,400,{error:'Raid invalida.'}); return; }
+    room.status = 'active';
+    // Consume stamina from all members
+    room.members.forEach(m => {
+      const u = db.users[m.username];
+      if (u&&u.gameState) u.gameState.stam = Math.max(0, (u.gameState.stam||0) - raidDef.stam);
+    });
+    saveDB(db);
+    // Notify all members raid started
+    room.members.forEach(m => sendSSE(m.username,'raid_started',{ roomId, raidId: room.raidId, boss: raidDef.boss, members: room.members }));
+    send(res,200,{ok:true, room}); return;
+  }
+
+  // POST /api/raid/complete-v2 — resolve the raid with combined power
+  if (method === 'POST' && url === '/api/raid/complete-v2') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { roomId } = await readBody(req);
+    const db = loadDB();
+    const room = db.raidRooms&&db.raidRooms[roomId];
+    if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
+    if (room.leader !== username) { send(res,403,{error:'Apenas o lider finaliza.'}); return; }
+    if (room.status !== 'active') { send(res,400,{error:'Raid nao esta ativa.'}); return; }
+    const raidDef = RAID_CATALOG[room.raidId];
+    if (!raidDef) { send(res,400,{error:'Raid invalida.'}); return; }
+
+    // Combined power of all members
+    let totalPower = 0;
+    room.members.forEach(m => {
+      const u = db.users[m.username];
+      if (u&&u.gameState) totalPower += calcPower(u.gameState);
+    });
+
+    // Boss power = boss.hp * boss.atk / 1000 (tunable difficulty)
+    const bossPower = Math.round(raidDef.boss.hp * raidDef.boss.atk / 8000);
+    const winChance = Math.min(0.92, Math.max(0.10, 0.50 + (totalPower - bossPower) / bossPower * 0.5));
+    const won = Math.random() < winChance;
+
+    room.status = 'done';
+    room.won = won;
+    room.totalPower = totalPower;
+    room.bossPower = bossPower;
+
+    const n = room.members.length;
+    const results = [];
+
+    if (won) {
+      // XP and gold split equally
+      const xpTotal  = Math.round(raidDef.xp[0]  + Math.random()*(raidDef.xp[1]-raidDef.xp[0]));
+      const goldTotal = Math.round(raidDef.gold[0] + Math.random()*(raidDef.gold[1]-raidDef.gold[0]));
+      const xpEach   = Math.round(xpTotal  / n);
+      const goldEach = Math.round(goldTotal / n);
+
+      // Drops split: give one drop per member (rotate through drop list)
+      const shuffled = [...raidDef.drops].sort(()=>Math.random()-0.5);
+      // Bonus drop — rare item, only ONE lucky member gets it
+      const bonusWinner = Math.random() < raidDef.bonusDrop.chance
+        ? room.members[Math.floor(Math.random()*n)].username
+        : null;
+
+      room.members.forEach((m, i) => {
+        const u = db.users[m.username];
+        if (!u||!u.gameState) return;
+        const g = u.gameState;
+        g.gold = (g.gold||0) + goldEach;
+        g.xp   = (g.xp||0)  + xpEach;
+        g.stats = g.stats||{};
+        g.stats.missions = (g.stats.missions||0)+1;
+        if (!g.consumables) g.consumables = [];
+        if (!g.inventory)   g.inventory   = [];
+        // Stone drop — rotate
+        const stone = shuffled[i % shuffled.length];
+        g.consumables.push(stone);
+        // Bonus item drop
+        let bonusItem = null;
+        if (bonusWinner === m.username) {
+          bonusItem = raidDef.bonusDrop.item;
+          g.inventory.push(bonusItem);
+        }
+        // Set cooldown
+        if (!db.raidCooldowns) db.raidCooldowns = {};
+        db.raidCooldowns[m.username+'_'+room.raidId] = Date.now();
+        if (!g.log) g.log = [];
+        g.log.unshift({ msg:'🌋 Raid '+raidDef.boss.name+': +'+goldEach+' ouro +'+xpEach+' XP'+(bonusItem?' 🎁 item épico!':''), cls:'good' });
+        results.push({ username:m.username, name:m.name, xp:xpEach, gold:goldEach, stone, bonusItem });
+        sendSSE(m.username,'raid_complete',{ won:true, xp:xpEach, gold:goldEach, stone, bonusItem, bossName:raidDef.boss.name, totalPower, bossPower });
+      });
+    } else {
+      // Defeat — small XP consolation, no drops, set cooldown
+      const xpConsole = Math.round(raidDef.xp[0] * 0.10 / n);
+      room.members.forEach(m => {
+        const u = db.users[m.username];
+        if (!u||!u.gameState) return;
+        const g = u.gameState;
+        g.xp = (g.xp||0) + xpConsole;
+        if (!db.raidCooldowns) db.raidCooldowns = {};
+        db.raidCooldowns[m.username+'_'+room.raidId] = Date.now();
+        if (!g.log) g.log = [];
+        g.log.unshift({ msg:'🌋 Derrota na Raid '+raidDef.boss.name+'. +'+xpConsole+' XP de consolação.', cls:'bad' });
+        results.push({ username:m.username, name:m.name, xp:xpConsole, gold:0, stone:null, bonusItem:null });
+        sendSSE(m.username,'raid_complete',{ won:false, xp:xpConsole, gold:0, bossName:raidDef.boss.name, totalPower, bossPower });
+      });
+    }
+
+    // Clean up room after 5 min
+    setTimeout(() => { const d=loadDB(); if(d.raidRooms) delete d.raidRooms[roomId]; saveDB(d); }, 5*60*1000);
+    saveDB(db);
+    send(res,200,{ ok:true, won, results, totalPower, bossPower, winChance:Math.round(winChance*100) }); return;
+  }
+
+  // GET /api/raid/cooldowns — player's cooldowns
+  if (method === 'GET' && url === '/api/raid/cooldowns') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const db = loadDB();
+    const cd = db.raidCooldowns||{};
+    const result = {};
+    Object.keys(RAID_CATALOG).forEach(rId => {
+      const key = username+'_'+rId;
+      const last = cd[key]||0;
+      const remaining = Math.max(0, RAID_CATALOG[rId].cooldownMs - (Date.now()-last));
+      result[rId] = remaining; // ms remaining, 0 = ready
+    });
+    send(res,200,{cooldowns:result}); return;
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CLAN MISSION DISTRIBUTE — Split XP + gold equally among online clan members
+  // Body: { totalXp, totalGold, missionName, missionId }
+  // ═══════════════════════════════════════════════════════════════════════
+  if (method === 'POST' && url === '/api/clan/mission/distribute') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const body = await readBody(req);
+    const totalXp   = Math.max(0, Math.floor(safeNumber(body.totalXp,   0, 1e15)));
+    const totalGold = Math.max(0, Math.floor(safeNumber(body.totalGold, 0, 1e12)));
+    const missionName = safeString(body.missionName || 'Missao de Cla', 80);
+
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user || !user.gameState || !user.gameState.clanName) {
+      // Not in a clan — just reward the solo player
+      send(res, 200, { ok: true, distributed: false, myShare: { xp: totalXp, gold: totalGold } });
+      return;
+    }
+
+    const clanName = user.gameState.clanName;
+
+    // Find all online clan members (including the one who completed it)
+    const clanMembers = Object.entries(db.users)
+      .filter(([u, d]) => d.gameState && d.gameState.clanName === clanName)
+      .map(([u, d]) => ({ username: u, gameState: d.gameState }));
+
+    // Split equally among ALL clan members (online or offline get same share)
+    // This encourages having a big active clan
+    const n = Math.max(1, clanMembers.length);
+    const xpEach   = Math.round(totalXp   / n);
+    const goldEach = Math.round(totalGold / n);
+
+    let myShare = { xp: xpEach, gold: goldEach };
+    const distributed = [];
+
+    clanMembers.forEach(({ username: u, gameState: g }) => {
+      g.gold = (g.gold || 0) + goldEach;
+      g.xp   = (g.xp   || 0) + xpEach;
+      g.stats = g.stats || {};
+      g.stats.missions = (g.stats.missions || 0) + 1;
+      if (!g.log) g.log = [];
+      g.log.unshift({ msg: '🛡 Clã "' + missionName + '": +' + xpEach + ' XP, +' + goldEach + ' ouro (1/' + n + ' membros)', cls: 'good' });
+      distributed.push({ username: u, xp: xpEach, gold: goldEach });
+
+      // Notify online members via SSE (except the one who did the mission — they get UI update)
+      if (u !== username && onlineMap.has(u)) {
+        sendSSE(u, 'clan_mission_reward', {
+          xp: xpEach, gold: goldEach,
+          missionName, totalMembers: n,
+          completedBy: user.gameState.name
+        });
+      }
+    });
+
+    saveDB(db);
+    send(res, 200, { ok: true, distributed: true, n, myShare, distributions: distributed });
+    return;
+  }
+
   send(res, 404, { error: 'Endpoint nao encontrado.' });
 }
 
@@ -2344,7 +3067,15 @@ server.listen(PORT, '0.0.0.0', () => {
   startupBackupCheck();          // Check on startup
   scheduleMidnightBackup();      // Daily at midnight
   scheduleHourlyBackup();        // Emergency hourly (keeps only 7)
-  console.log('[BACKUP] Pasta: ./backups/  |  Diarios: ' + MAX_DAILY_BACKUPS + '  |  Horarios: ' + MAX_HOURLY_BACKUPS + '\n');
+  console.log('[BACKUP] Pasta: ./backups/  |  Diarios: ' + MAX_DAILY_BACKUPS + '  |  Horarios: ' + MAX_HOURLY_BACKUPS);
+
+  // ── Passive regeneration every 5 minutes ──
+  const REGEN_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  setInterval(runPassiveRegen, REGEN_INTERVAL);
+  console.log('[REGEN] Regeneracao passiva ativa: +10 HP +5 Estamina a cada 5 minutos');
+
+  // ── Run data migrations for existing players ──
+  runMigrations();
 });
 
 // Graceful shutdown — backup before exit

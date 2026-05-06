@@ -729,6 +729,21 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 .btn-buy-pix:disabled{opacity:.4;cursor:not-allowed}
 .vip-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(160,100,220,.2);border:1px solid rgba(160,100,220,.4);border-radius:3px;font-size:10px;color:#c090e0;font-family:Cinzel,serif}
 
+/* ── RAID CARDS ── */
+.raid-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px;position:relative;overflow:hidden;transition:border-color .2s}
+.raid-card:hover{border-color:var(--border-light)}
+.raid-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--red),transparent)}
+.raid-boss-icon{font-size:42px;text-align:center;margin-bottom:8px;filter:drop-shadow(0 0 12px rgba(255,60,60,.4))}
+.raid-boss-name{font-family:'Cinzel',serif;font-size:15px;color:var(--red-light);text-align:center;margin-bottom:4px}
+.raid-boss-desc{font-size:12px;color:var(--text-muted);text-align:center;margin-bottom:12px;line-height:1.5}
+.raid-slots-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(180,40,40,.2);border:1px solid rgba(180,40,40,.4);border-radius:12px;font-size:11px;color:#ff8888;font-family:Cinzel,serif}
+.raid-reward-row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+.raid-reward-tag{font-size:11px;padding:2px 8px;border-radius:3px;background:var(--bg-dark);border:1px solid var(--border)}
+.raid-member-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.raid-member-row:last-child{border-bottom:none}
+.raid-cd-bar{height:4px;background:rgba(0,0,0,.3);border-radius:2px;margin-top:4px;overflow:hidden}
+.raid-cd-fill{height:100%;background:var(--red);border-radius:2px;transition:width 1s linear}
+
 </style>
 </head>
 <body>
@@ -890,6 +905,16 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
       <div class="create-welcome-name">Bem-vindo, <span id="create-username">herói</span>!</div>
       <div class="create-welcome-sub">Crie seu personagem para entrar nas Terras de Arathorn</div>
     </div>
+
+    <!-- FREE 30min VIP banner -->
+    <div style="background:linear-gradient(135deg,#1a1200,#2a1f00);border:1px solid var(--gold);border-radius:var(--radius-lg);padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:22px">🎁</span>
+      <div>
+        <div style="font-family:Cinzel,serif;font-size:12px;color:var(--gold)">30 MINUTOS DE VIP GRÁTIS!</div>
+        <div style="font-size:11px;color:var(--text-muted)">Todo novo herói começa com VIP ativo.</div>
+      </div>
+    </div>
+
     <div class="form-group">
       <label class="form-label">Nome do Personagem</label>
       <input type="text" class="form-input" id="inp-char-name" placeholder="Ex: Aerindel Sombraverde" maxlength="28">
@@ -905,7 +930,32 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
         <div class="race-card" data-race="mago" onclick="selectRace(this)"><div class="race-icon">🧙</div><div class="race-name">Mago</div><div class="race-desc">Domina feitiços arcanos.</div><div class="race-stats">+MAG +DEX | -RES</div></div>
       </div>
     </div>
-    <button class="btn-create" onclick="createCharacter()">⚔ Entrar no Reino</button>
+
+    <!-- VIP offer box -->
+    <div id="vip-offer-box" style="background:linear-gradient(135deg,#12001e,#1e0030);border:1px solid rgba(160,100,220,.6);border-radius:var(--radius-lg);padding:14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:20px">👑</span>
+        <div>
+          <div style="font-family:Cinzel,serif;font-size:13px;color:#c090e0">Comece com VIP e lidere o ranking!</div>
+          <div style="font-size:11px;color:var(--text-muted)">R$ 9,90/mês — cancele quando quiser</div>
+        </div>
+        <div style="margin-left:auto;font-family:Cinzel,serif;font-size:16px;color:#c090e0;font-weight:700">R$9,90</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;font-size:11px">
+        <div style="color:var(--green-light)">✓ +10 Estamina Máxima</div>
+        <div style="color:var(--green-light)">✓ +10% XP por missão</div>
+        <div style="color:var(--green-light)">✓ +10% drop de itens</div>
+        <div style="color:var(--green-light)">✓ +5 pontos/atributo por nível</div>
+        <div style="color:var(--green-light)">✓ 👑 Ícone VIP ao lado do nick</div>
+        <div style="color:var(--green-light)">✓ Acesso a missões exclusivas</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" style="flex:1;background:linear-gradient(135deg,#7030a0,#9050c0);border:none;color:#fff;font-family:Cinzel,serif;font-size:11px;letter-spacing:1px;padding:10px" onclick="createCharacterWithVip()">👑 ATIVAR VIP POR R$9,90</button>
+        <button class="btn btn-sm" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-muted);font-size:11px" onclick="createCharacter(false)">Entrar sem VIP</button>
+      </div>
+    </div>
+
+    <button class="btn-create" onclick="createCharacter(false)" style="background:var(--bg-light);color:var(--text-muted);font-size:11px;letter-spacing:1px;padding:10px">⚔ Entrar no Reino (sem VIP)</button>
   </div>
 </div>
 
@@ -934,6 +984,14 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
     <div class="hud-stat"><span style="color:var(--gold);font-size:12px">⬡</span><span class="hud-stat-val" id="hud-gold">0</span><span class="hud-stat-label">ouro</span></div>
     <div class="hud-stat"><span style="color:var(--green-light);font-size:12px">★</span><span class="hud-stat-label">Nv.</span><span class="hud-stat-val" id="hud-level">1</span></div>
     <div id="ko-indicator" style="display:none;background:rgba(192,64,64,.2);border:1px solid var(--red);border-radius:var(--radius);padding:3px 10px;font-size:11px;color:var(--red-light);font-family:Cinzel,serif;letter-spacing:1px;animation:koFlash 1s infinite alternate"></div>
+    <!-- Global infirmary indicator -->
+    <div id="global-infirmary-indicator" style="display:none;background:rgba(192,40,40,.2);border:1px solid rgba(192,40,40,.6);border-radius:var(--radius);padding:4px 10px;font-size:12px;color:var(--red-light);align-items:center;gap:6px;cursor:pointer" onclick="navToTaverna()">
+      <span id="global-ko-timer">🏥 —</span>
+    </div>
+    <!-- Global jail indicator -->
+    <div id="global-jail-indicator" style="display:none;background:rgba(100,80,20,.2);border:1px solid rgba(201,168,76,.5);border-radius:var(--radius);padding:4px 10px;font-size:12px;color:var(--gold);align-items:center;gap:6px;cursor:pointer" onclick="navToTaverna()">
+      <span id="global-jail-timer">🔒 —</span>
+    </div>
     <div class="topbar-right">
       <span class="save-status" id="save-status">●</span>
       <div class="online-dot"></div>
@@ -963,6 +1021,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
       <div class="nav-section-label">Social</div>
       <div class="nav-item" data-page="amigos" data-label="Amigos" onclick="navTo(this)"><span class="nav-icon">👥</span> Amigos <span class="nav-badge" id="friend-req-badge" style="display:none">!</span></div>
       <div class="nav-item" data-page="party" data-label="Party" onclick="navTo(this)"><span class="nav-icon">🤝</span> Party <span class="nav-badge" id="party-badge" style="display:none">!</span></div>
+      <div class="nav-item" data-page="raids" data-label="Raids" onclick="navTo(this)"><span class="nav-icon">🌋</span> Raids <span class="nav-badge" id="raid-badge" style="display:none">!</span></div>
       <div class="nav-item" data-page="chat" data-label="Chat" onclick="navTo(this)"><span class="nav-icon">💬</span> Chat <span class="nav-badge" id="chat-unread-badge" style="display:none">0</span></div>
       <div class="nav-item" data-page="arena" data-label="Arena" onclick="navTo(this)"><span class="nav-icon">⚔️</span> Arena PvP <span class="nav-badge" id="duel-notif" style="display:none">!</span></div>
       <div class="nav-item" data-page="clan" data-label="Clã" onclick="navTo(this)"><span class="nav-icon">🛡️</span> Clã</div>
@@ -1093,6 +1152,13 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
         </div>
         <!-- equip tab -->
         <div id="inv-tab-equip">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:8px 10px;background:var(--bg-dark);border-radius:var(--radius);border:1px solid var(--border)">
+            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:var(--text-secondary);user-select:none">
+              <input type="checkbox" id="hide-equipped-toggle" onchange="renderInventory('equip')" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer">
+              Esconder itens equipados
+            </label>
+            <span style="margin-left:auto;font-size:11px;color:var(--text-muted)" id="inv-count-label"></span>
+          </div>
           <div class="card" style="margin-bottom:0"><div id="inv-grid" class="grid-3"></div></div>
         </div>
         <!-- consum tab -->
@@ -1224,12 +1290,26 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
             <div>HP: <b id="tav-hp">0</b>/<b id="tav-hp-max">100</b></div>
           </div>
         </div>
-        <!-- Enfermaria banner (shown when knocked out) -->
+        <!-- Jail banner (shown when in jail) -->
+        <div id="tav-jail-banner" style="display:none;background:rgba(80,60,20,.2);border:1px solid rgba(201,168,76,.5);border-radius:var(--radius-lg);padding:14px 18px;margin-bottom:14px;text-align:center">
+          <div style="font-size:22px;margin-bottom:4px">🔒</div>
+          <div style="font-family:Cinzel,serif;font-size:14px;color:var(--gold);margin-bottom:4px">Na Cadeia</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Você está preso e não pode fazer crimes.<br>Soltura em: <b id="tav-jail-timer" style="color:var(--gold)">—</b></div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-gold btn-sm" onclick="payBail()">💰 Pagar 10.000 ouro de fiança</button>
+            <button class="btn btn-green btn-sm" onclick="buyJailRelease()">⚡ PIX R$2,99 — Sair agora</button>
+          </div>
+        </div>
+
+        <!-- Enfermaria banner (shown when knocked out) - still shown in taverna -->
         <div id="tav-infirmary-banner" style="display:none;background:rgba(192,40,40,.15);border:1px solid rgba(192,40,40,.5);border-radius:var(--radius-lg);padding:14px 18px;margin-bottom:14px;text-align:center">
           <div style="font-size:22px;margin-bottom:4px">🏥</div>
           <div style="font-family:Cinzel,serif;font-size:14px;color:var(--red-light);margin-bottom:4px">Na Enfermaria</div>
-          <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Você foi derrotado num duelo e está se recuperando.<br>Recuperação em: <b id="tav-infirmary-timer" style="color:var(--red-light)">—</b></div>
-          <button class="btn btn-gold" onclick="reviveNow()">💊 Pagar 3.000 ouro para sair agora</button>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Você foi derrotado e está se recuperando.<br>Recuperação em: <b id="tav-infirmary-timer" style="color:var(--red-light)">—</b></div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-gold btn-sm" onclick="reviveNow()">💊 Pagar 3.000 ouro</button>
+            <button class="btn btn-green btn-sm" onclick="buyRevivePix()">⚡ PIX R$2,99 — Curar agora</button>
+          </div>
         </div>
         <div class="tabs">
           <div class="tab active" onclick="tavernTab(this,'players')">⚔ Players Aqui</div>
@@ -1765,12 +1845,14 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
           <div class="tab" onclick="shopRealTab(this,'gold')">⬡ Ouro</div>
           <div class="tab" onclick="shopRealTab(this,'vip')">👑 VIP</div>
           <div class="tab" onclick="shopRealTab(this,'stones')">💠 Pedras</div>
+          <div class="tab" style="color:var(--red-light)" onclick="shopRealTab(this,'emergency')">🆘 Emergência</div>
         </div>
 
         <div id="shop-real-packs" class="grid-2"></div>
         <div id="shop-real-gold"  class="grid-2" style="display:none"></div>
         <div id="shop-real-vip"   class="grid-2" style="display:none"></div>
         <div id="shop-real-stones" class="grid-2" style="display:none"></div>
+        <div id="shop-real-emergency" class="grid-2" style="display:none"></div>
 
         <div style="margin-top:16px;padding:12px;background:var(--bg-dark);border-radius:var(--radius);font-size:11px;color:var(--text-muted);line-height:1.7">
           🔒 Pagamento 100% seguro via PIX — processado pelo Mercado Pago<br>
@@ -1807,6 +1889,38 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
           <!-- Status -->
           <div id="pix-status" style="padding:10px;border-radius:var(--radius);background:var(--bg-dark);font-size:13px;color:var(--text-secondary)">
             ⏳ Aguardando pagamento...
+          </div>
+        </div>
+      </div>
+
+
+      <!-- RAIDS -->
+      <div class="page" id="page-raids">
+        <div class="page-title">🌋 Raids de Clã</div>
+        <div class="page-sub">Reúna seu clã e enfrente bosses poderosos — drops exclusivos e XP em dobro</div>
+
+        <!-- Not in clan -->
+        <div id="raid-no-clan" class="card" style="text-align:center;padding:24px;display:none">
+          <div style="font-size:40px;margin-bottom:10px">🛡</div>
+          <div style="font-family:Cinzel,serif;font-size:14px;margin-bottom:6px">Você precisa de um Clã</div>
+          <div style="font-size:13px;color:var(--text-muted)">Apenas membros de clã podem participar de raids.</div>
+        </div>
+
+        <!-- Raid list -->
+        <div id="raid-list"></div>
+
+        <!-- Active lobby (when in a room) -->
+        <div id="raid-lobby" style="display:none">
+          <div class="card">
+            <div class="card-title" id="raid-lobby-title">🌋 Sala de Raid</div>
+            <div style="margin-bottom:12px">
+              <div id="raid-lobby-boss" style="text-align:center;padding:16px;background:var(--bg-dark);border-radius:var(--radius);margin-bottom:12px"></div>
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Membros na sala:</div>
+              <div id="raid-lobby-members"></div>
+              <div id="raid-lobby-slots" style="font-size:12px;color:var(--text-muted);margin-top:6px"></div>
+            </div>
+            <div id="raid-lobby-actions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+            <div id="raid-lobby-cooldown" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div>
           </div>
         </div>
       </div>
@@ -1864,12 +1978,28 @@ async function api(method, path, body) {
 }
 
 function authTab(tab) {
-  document.getElementById('form-login').style.display = tab === 'login' ? '' : 'none';
-  document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
-  document.getElementById('tab-login').className = 'auth-tab' + (tab === 'login' ? ' active' : '');
-  document.getElementById('tab-register').className = 'auth-tab' + (tab === 'register' ? ' active' : '');
-  document.getElementById('l-error').textContent = '';
-  document.getElementById('r-error').textContent = '';
+  // Show/hide forms
+  ['login','register','recover'].forEach(t => {
+    const el = document.getElementById('form-'+t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  // Update tab active state (only login/register have tab buttons)
+  ['login','register'].forEach(t => {
+    const el = document.getElementById('tab-'+t);
+    if (el) el.className = 'auth-tab' + (t === tab ? ' active' : '');
+  });
+  // Clear errors
+  ['l-error','r-error','rec-error'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '';
+  });
+  // Reset recover to step 1 when opening
+  if (tab === 'recover') {
+    const s1 = document.getElementById('rec-step1');
+    const s2 = document.getElementById('rec-step2');
+    if (s1) s1.style.display = '';
+    if (s2) s2.style.display = 'none';
+  }
 }
 
 async function doLogin() {
@@ -2433,6 +2563,15 @@ const SHOP_ITEMS = {
   {id:'em1',icon:'⚡',name:'Cristal Arcano',         slot:'earring',class:'mago',  mag:10,mana:30,price:180, minLv:4, grade:'normal',   desc:'MAG +10 MANA +30'},
   {id:'em2',icon:'⚡',name:'Fragmento de Poder',     slot:'earring',class:'mago',  mag:20,mana:60,price:900, minLv:14,grade:'excellent', desc:'MAG +20 MANA +60'},
   {id:'em3',icon:'🌀',name:'Anel do Vórtice',        slot:'earring',class:'mago',  mag:30,mana:90,price:3500,minLv:28,grade:'superrare',desc:'MAG +30 MANA +90'},
+
+  // ── ITENS ESPECIAIS — bônus únicos ─────────────────────────────────────────
+  // Anel da Fortuna: +10% ouro por missão (todos os personagens, slot: ring)
+  {id:'ring_fortune',  icon:'🪙', name:'Anel da Fortuna',      slot:'ring',   class:null, price:8000,  minLv:20, grade:'epic',
+   str:0,dex:0,mag:0,res:0, desc:'+10% ouro em todas as missões', goldBonus:0.10, special:'goldBonus'},
+
+  // Colar da Resistência: +10 estamina máx (todos os personagens, slot: earring)
+  {id:'neck_endurance', icon:'💚', name:'Colar da Resistência', slot:'earring', class:null, price:8000,  minLv:20, grade:'epic',
+   str:0,dex:0,mag:0,res:0, desc:'+10 Estamina Máxima permanente enquanto equipado', stamBonus:10, special:'stamBonus'},
  ],
 };
 
@@ -2758,18 +2897,17 @@ function getEquipBonus(stat) {
   const eq = G.equipment || {};
   Object.values(eq).forEach(invId => {
     if (!invId) return;
-    const pureInvId = baseInvId ? baseInvId(invId) : invId;
+    const withoutLucky2 = baseInvId ? baseInvId(invId) : invId;  // keeps +N, strips lucky
+    const pureInvId = basePureId ? basePureId(invId) : invId;    // strips +N and lucky, for findItem
     const it = findItem(pureInvId);
     if (!it) return;
-    const refine = getRefineLevel(pureInvId);
-    const refBonusData = getRefineBonus(refine);
+    const refine = getRefineLevel(withoutLucky2);  // reads +N correctly from invId
+    const refTotal2 = computeRefineTotal ? computeRefineTotal(refine) : 0;
     const classMult = getClassBonusMultiplier(invId);
     // Apply total refine bonus to each stat the item has (> 0)
     const baseStat = it[stat] || 0;
-    // Lucky items: tracked as it.lucky — no stat impact, only forge chance
     if (baseStat > 0) {
-      const refAdd = refBonusData._total || 0;
-      const base = baseStat + refAdd;
+      const base = baseStat + refTotal2;  // use computeRefineTotal for cumulative bonus
       total += Math.round(base * classMult);
     }
   });
@@ -2825,7 +2963,9 @@ function updateUI() {
   const mb = document.getElementById('hud-mana-bar'); if (mb) mb.style.width = pct(G.mana, G.manaMax);
   se('hud-mana-label', G.mana+'/'+G.manaMax);
   const sb = document.getElementById('hud-stam-bar'); if (sb) sb.style.width = pct(G.stam, G.stamMax);
-  se('hud-stam-label', G.stam+'/'+G.stamMax);
+  const _hasStamNeckHud = Object.values(G.equipment||{}).some(eId => eId && typeof basePureId === 'function' && basePureId(eId) === 'neck_endurance');
+  const _hudStamMax = G.stamMax + (_hasStamNeckHud ? 10 : 0);
+  se('hud-stam-label', G.stam+'/'+_hudStamMax);
   // Knocked out indicator
   const koEl = document.getElementById('ko-indicator');
   if (koEl) {
@@ -2837,7 +2977,11 @@ function updateUI() {
       koEl.style.display='none';
     }
   }
-  se('hud-gold', G.gold); se('hud-level', G.level); se('hud-name', G.name);
+  se('hud-gold', G.gold); se('hud-level', G.level);
+  const _amAssassin = _serverAssassin && _serverAssassin.username === AUTH.username;
+  const _isVipNow = G.vipUntil && G.vipUntil > Date.now();
+  const _namePrefix = _amAssassin ? '💀 ' : (_isVipNow ? '👑 ' : '');
+  se('hud-name', _namePrefix + (G.name || '—'));
   // Perfil
   ['p-avatar','rp-avatar'].forEach(id => se(id, icon));
   se('p-race-icon', icon);
@@ -2867,12 +3011,17 @@ function updateUI() {
   // VIP indicator
   const _vipActive = G.vipUntil && G.vipUntil > Date.now();
   const _vipBadge = document.getElementById('p-role-badge');
-  if (_vipBadge && _vipActive && !G.clanRole) {
-    _vipBadge.style.display = '';
-    _vipBadge.textContent = '👑 VIP';
-    _vipBadge.style.color = '#ffd700';
-    _vipBadge.style.borderColor = '#ffd70055';
-    _vipBadge.style.background = '#ffd70015';
+  if (_vipBadge) {
+    if (_vipActive) {
+      _vipBadge.style.display = '';
+      _vipBadge.textContent = '👑 VIP';
+      _vipBadge.style.color = '#c090e0';
+      _vipBadge.style.borderColor = 'rgba(160,100,220,.5)';
+      _vipBadge.style.background = 'rgba(100,50,160,.15)';
+    } else {
+      // Only hide if we just cleared it (don't override clan role badge)
+      if (_vipBadge.textContent === '👑 VIP') _vipBadge.style.display = 'none';
+    }
   }
   se('rp-name', G.name);
   se('rp-level', 'Nível ' + G.level + ' • ' + race.name);
@@ -2886,7 +3035,11 @@ function updateUI() {
   }
   setBar('p-hp-bar','p-hp-txt',G.hp,G.hpMax);
   setBar('p-mana-bar','p-mana-txt',G.mana,G.manaMax);
-  setBar('p-stam-bar','p-stam-txt',G.stam,G.stamMax);
+  // Colar da Resistência: +10 stam máx enquanto equipado
+  const _hasStamNeck = Object.values(G.equipment||{}).some(eId => eId && basePureId(eId) === 'neck_endurance');
+  const _effectiveStamMax = G.stamMax + (_hasStamNeck ? 10 : 0);
+  if (_hasStamNeck && G.stam > _effectiveStamMax) G.stam = _effectiveStamMax;
+  setBar('p-stam-bar','p-stam-txt',G.stam,_effectiveStamMax);
   setBar('p-xp-bar','p-xp-txt',G.xp,G.xpNext);
   setBar('rp-hp-bar','rp-hp-txt',G.hp,G.hpMax);
   setBar('rp-mana-bar','rp-mana-txt',G.mana,G.manaMax);
@@ -2957,6 +3110,7 @@ function updateUI() {
   checkAchievements();
   // Infirmary banner
   if (typeof updateInfirmaryBanner === "function") updateInfirmaryBanner();
+  if (typeof updateJailBanner === "function") updateJailBanner();
   // Schedule save
   scheduleSave();
 }
@@ -2996,7 +3150,7 @@ function updateEquipSlots() {
 
     if (nameEl) {
       if (item) {
-        const refine = getRefineLevel(baseInvId ? baseInvId(eId) : eId);
+        const refine = getRefineLevel(baseInvId ? baseInvId(eId) : eId);  // keeps +N for refine reading
         const refStr = refine > 0 ? ' [+'+refine+']' : '';
         const lucky = isLuckyItem ? isLuckyItem(eId) : false;
         const luckyStr = lucky ? '🍀' : '';
@@ -3043,6 +3197,7 @@ function navTo(el) {
   if (page==='enviar')     { renderSendGoldPage(); }
   if (page==='amigos')     { renderAmigos(); }
   if (page==='party')      { renderParty(); }
+  if (page==='raids')      { initRaids(); }
   if (page==='chat')       { initChatPage(); }
   if (page==='loja-real')  { initShopReal(); }
   if (page==='inventario') { invTab(document.querySelector('#page-inventario .tab'), 'equip'); }
@@ -3052,7 +3207,7 @@ function navTo(el) {
   if (page==='missoes')    renderMissions('solo');
   if (page==='loja')       renderShop();
   if (page==='alquimia')   renderAlchemy();
-  if (page==='taverna')    { renderTavern(); renderTavernPlayers(); updateInfirmaryBanner(); tavernTab(document.querySelector('#page-taverna .tab'), 'players'); }
+  if (page==='taverna')    { renderTavern(); renderTavernPlayers(); updateInfirmaryBanner(); updateJailBanner(); tavernTab(document.querySelector('#page-taverna .tab'), 'players'); }
   if (page==='clan')       renderClan();
 }
 
@@ -3297,6 +3452,13 @@ function buildShopItemCard(it) {
   // Drop-only warning for expensive items (tier 4+)
   const tierNum = it.tier || 0;
   const dropOnly = it.price >= 50000 || (it.minLv && it.minLv >= 100);
+  // Special item bonus badge
+  const specialBadge = it.special === 'goldBonus'
+    ? '<div style="font-size:11px;color:var(--gold);font-weight:600;margin-bottom:4px">🪙 +' + Math.round((it.goldBonus||0)*100) + '% ouro em missões</div>'
+    : it.special === 'stamBonus'
+    ? '<div style="font-size:11px;color:var(--blue-light);font-weight:600;margin-bottom:4px">💚 +' + (it.stamBonus||0) + ' Estamina Máxima</div>'
+    : '';
+
   const dropBadge = dropOnly
     ? '<div style="font-size:9px;color:var(--red-light);letter-spacing:.5px;font-family:Cinzel,serif;margin-bottom:3px">⚠ RECOMENDADO: CONSEGUIR VIA DROP</div>'
     : '';
@@ -3316,6 +3478,7 @@ function buildShopItemCard(it) {
     + '<div class="shop-item-name" style="color:' + grade.color + '">' + it.name + '</div>'
     + '<div class="shop-item-stats">' + it.desc + '</div>'
     + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Nível ' + it.minLv + '+ necessário</div>'
+    + specialBadge
     + dropBadge
     + priceHtml
     + (equipped ? '<span class="badge badge-gold">Equipado</span>'
@@ -3418,8 +3581,9 @@ function calcSellPriceClient(invId) {
 function buildInvItemCard(invId, mode) {
   const it = findItem(invId);
   if (!it) return '';
-  const pureBase = typeof baseInvId === 'function' ? baseInvId(invId) : invId;
-  const refine = getRefineLevel(pureBase);
+  const _withoutLucky = typeof baseInvId === 'function' ? baseInvId(invId) : invId;
+  const pureBase = typeof basePureId === 'function' ? basePureId(invId) : invId;
+  const refine = getRefineLevel(_withoutLucky);  // reads +N correctly
   const grade = ITEM_GRADES[it.grade] || ITEM_GRADES.normal;
   const equipped = Object.values(G.equipment||{}).includes(invId);
   const lucky = typeof isLuckyItem === 'function' && isLuckyItem(invId);
@@ -3436,7 +3600,10 @@ function buildInvItemCard(invId, mode) {
   let actions = '';
   if (mode === 'equip') {
     actions = equipped
-      ? '<span class="badge badge-gold">Equipado</span>'
+      ? '<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center">'
+        + '<span class="badge badge-gold">Equipado</span>'
+        + '<button class="btn btn-sm btn-red" data-inv="'+invId+'" onclick="unequipItemByData(this)" title="Desequipar" style="font-size:11px;padding:3px 8px">↩ Desequipar</button>'
+        + '</div>'
       : '<button class="btn btn-gold btn-sm" data-inv="'+invId+'" onclick="equipItemByData(this)">Equipar</button>';
   } else if (mode === 'sell') {
     const sellPrice = calcSellPriceClient(invId);
@@ -3486,7 +3653,13 @@ function renderInventory(mode) {
   // EQUIP tab
   if (mode === 'equip') {
     const grid = document.getElementById('inv-grid');
-    if (grid) grid.innerHTML = inv.length ? inv.map(id => buildInvItemCard(id, 'equip')).join('') : empty;
+    const hideEquipped = document.getElementById('hide-equipped-toggle')?.checked || false;
+    const countLabel = document.getElementById('inv-count-label');
+    const filtered = hideEquipped
+      ? inv.filter(id => !Object.values(G.equipment||{}).includes(id))
+      : inv;
+    if (countLabel) countLabel.textContent = filtered.length + '/' + inv.length + ' itens';
+    if (grid) grid.innerHTML = filtered.length ? filtered.map(id => buildInvItemCard(id, 'equip')).join('') : (hideEquipped ? '<div style="color:var(--text-muted);font-size:13px;font-style:italic;padding:16px;text-align:center;grid-column:1/-1">Todos os itens estão equipados.</div>' : empty);
   }
   // CONSUM tab
   if (mode === 'consum') {
@@ -3559,10 +3732,19 @@ function buildRankRow(p, i, isMe, crowns, extraInfo) {
   const raceD = RACES[p.race]||{icon:'👤'};
   const myCrowns = crowns[p.username] || [];
   const crownStr = myCrowns.length > 0 ? ' ' + '👑'.repeat(myCrowns.length) : '';
-  return '<div class="rank-row rank-row-clickable" data-user="' + p.username + '" onclick="openPublicProfileByData(this)"' + (isMe?' style="border-color:var(--gold-dark);background:rgba(201,168,76,.06)"':'') + '>' +
+  const isAssassin = _serverAssassin && _serverAssassin.username === p.username;
+  const assassinBadge = isAssassin
+    ? ' <span title="💀 Assassino do Servidor — '+(_serverAssassin.kills)+' kills" style="font-size:13px;cursor:help">💀</span>'
+    : '';
+  const rowStyle = isMe
+    ? 'border-color:var(--gold-dark);background:rgba(201,168,76,.06)'
+    : isAssassin
+    ? 'border-color:rgba(180,40,40,.5);background:rgba(180,40,40,.05)'
+    : '';
+  return '<div class="rank-row rank-row-clickable" data-user="' + p.username + '" onclick="openPublicProfileByData(this)"' + (rowStyle?' style="'+rowStyle+'"':'') + '>' +
     '<div class="rank-pos ' + (i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'') + '">#' + (i+1) + '</div>' +
     '<span style="font-size:15px">' + raceD.icon + '</span>' +
-    '<div class="rank-name">' + p.name + (isMe?' (Você)':'') + crownStr + '</div>' +
+    '<div class="rank-name">' + p.name + (isMe?' (Você)':'') + crownStr + assassinBadge + '</div>' +
     '<div class="rank-info">' + (extraInfo||('Nv.'+p.level)) + '</div>' +
     '<div class="rank-power">⚡ ' + p.power.toLocaleString() + '</div>' +
     '</div>';
@@ -3798,11 +3980,60 @@ function buyItem(id) {
 }
 function equipItemByData(btn) { equipItem(btn.dataset.inv); }
 
+function unequipItemByData(btn) { unequipItem(btn.dataset.inv); }
+
+function unequipItem(invId) {
+  // Find which slot this item is in
+  const eq = G.equipment || {};
+  let foundSlot = null;
+  Object.entries(eq).forEach(([slot, eId]) => {
+    if (eId === invId) foundSlot = slot;
+  });
+  if (!foundSlot) { toast('Item não está equipado.', 'bad'); return; }
+  const it = findItem(invId);
+  const name = it ? it.name : invId;
+  const refine = getRefineLevel(baseInvId(invId));
+  const refStr = refine > 0 ? ' [+'+refine+']' : '';
+  // Remove from equipment slot
+  G.equipment[foundSlot] = null;
+  addLog('↩ Desequipou: ' + name + refStr, 'info');
+  toast('↩ ' + name + refStr + ' desequipado.', 'info');
+  updateUI();
+  renderInventory('equip');
+  // If stam necklace removed, cap stam to base max
+  if (basePureId(invId) === 'neck_endurance' && G.stam > G.stamMax) {
+    G.stam = G.stamMax;
+  }
+  forceSave();
+}
+
 function equipItem(id) {
-  const it=findItem(id); if(!it)return;
-  G.equipment[it.slot]=id;
-  addLog('⚔ Equipou: '+it.name,'good');
-  toast('✅ '+it.name+' equipado!','good');
+  const it = findItem(id);
+  if (!it) return;
+
+  // ── BUG FIX: prevent equipping same base item twice ──────────────────
+  // Each slot can only have 1 item. But also: same BASE item (same id,
+  // different refine) cannot be in two slots simultaneously.
+  const baseId = basePureId(id);
+
+  // Check if ANY slot already has this same base item (different refine)
+  let alreadyEquippedSlot = null;
+  Object.entries(G.equipment || {}).forEach(([slot, eId]) => {
+    if (eId && basePureId(eId) === baseId && slot !== it.slot) {
+      alreadyEquippedSlot = slot;
+    }
+  });
+  if (alreadyEquippedSlot) {
+    toast('⚠️ Você já tem este item equipado em outro slot!', 'bad');
+    return;
+  }
+
+  // Also check: block equipping same item NAME in same slot type if it's a
+  // duplicate in inventory (same base id = same item, just different refine level)
+  // This is fine to allow — you're just upgrading the equipped piece
+  G.equipment[it.slot] = id;
+  addLog('⚔ Equipou: ' + it.name + (getRefineLevel(baseInvId(id)) > 0 ? ' [+'+getRefineLevel(baseInvId(id))+']' : ''), 'good');
+  toast('✅ ' + it.name + ' equipado!', 'good');
   updateUI(); renderInventory(); renderShop();
   forceSave();
 }
@@ -3834,14 +4065,49 @@ function useConsumable(id) {
 // ══════════════════════════════════════════════════════════
 // COMBAT
 // ══════════════════════════════════════════════════════════
-function startMission(missionId) {
-  const m=MISSIONS.find(x=>x.id===missionId); if(!m)return;
-  if(G.stam<m.stam){toast('⚡ Estamina insuficiente! Vá à Taverna.','bad');return;}
-  if(G.level<m.minLv){toast('Nível '+m.minLv+' necessário!','bad');return;}
-  if(m.type==='clan'&&!G.clanName){toast('Esta missão requer um clã!','bad');return;}
-  if(m.type==='crime'&&Date.now()<(G.jailUntil||0)){toast('Você está preso!','bad');return;}
-  G.stam-=m.stam;
-  const enemy=m.enemies[Math.floor(Math.random()*m.enemies.length)];
+async function startMission(missionId) {
+  const m = MISSIONS.find(x => x.id === missionId);
+  if (!m) return;
+  if (G.stam < m.stam) { toast('⚡ Estamina insuficiente! Vá à Taverna.','bad'); return; }
+  if (G.level < m.minLv) { toast('Nível '+m.minLv+' necessário!','bad'); return; }
+  if (m.type === 'clan' && !G.clanName) { toast('Esta missão requer um clã!','bad'); return; }
+  if (isKnockedOut()) { toast('💀 Você está na Enfermaria! Recupere-se antes.','bad'); return; }
+  if (m.type === 'crime') {
+    if (Date.now() < (G.jailUntil||0)) { toast('🔒 Você está preso! Pague a fiança ou aguarde.','bad'); return; }
+    // Call server to register crime and check if 11th (gets caught)
+    const crimeRes = await api('POST', '/api/crime/commit');
+    if (crimeRes.error) { toast(crimeRes.error,'bad'); return; }
+    if (crimeRes.caughtByCounter) {
+      // Automatically arrested — 10 min jail
+      G.stam -= m.stam;
+      G.jailUntil = Date.now() + 10 * 60 * 1000;
+      if (!G.log) G.log = [];
+      G.log.unshift({msg:'🚔 PRESO! Você foi o '+crimeRes.crimeNum+'º crime do servidor — a guarda estava esperando! 10min na cadeia.', cls:'bad'});
+      addLog('🚔 PRESO no crime #'+crimeRes.crimeNum+' do servidor! 10min na cadeia.','bad');
+      toast('🚔 PRESO! Você foi pego em flagrante!','bad');
+      updateUI();
+      updateJailBanner();
+      forceSave();
+      showModal(
+        '🚔 Preso em Flagrante!',
+        '<div style="text-align:center">'
+        + '<div style="font-size:36px;margin-bottom:8px">🚔</div>'
+        + '<div style="font-size:14px;color:var(--red-light);font-weight:700;margin-bottom:10px">A guarda estava esperando!</div>'
+        + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Você foi o <b>'+crimeRes.crimeNum+'º crime</b> cometido no servidor.<br>As autoridades estavam monitorando.</div>'
+        + '<div style="padding:10px;background:rgba(192,40,40,.1);border-radius:var(--radius);font-size:12px;color:var(--red-light)">'
+        + '🔒 Cadeia por 10 minutos<br><small>Pague 10.000 ouro de fiança ou R$2,99 via PIX para sair</small>'
+        + '</div></div>',
+        [
+          { label: '💰 Pagar 10.000 ouro', fn: async () => { closeModal(); await payBail(); }},
+          { label: '⚡ PIX R$2,99', cls:'btn-green', fn: () => { closeModal(); buyJailRelease(); }},
+          { label: '🔒 Aguardar', fn: closeModal }
+        ]
+      );
+      return;
+    }
+  }
+  G.stam -= m.stam;
+  const enemy = m.enemies[Math.floor(Math.random() * m.enemies.length)];
   openCombat(m, enemy);
 }
 
@@ -3955,14 +4221,23 @@ function finalizeCombat(won, m, enemyName, finalHp, clog) {
     const _isVip = G.vipUntil && G.vipUntil > Date.now();
     let gold = Math.round(m.gold[0] + Math.random() * (m.gold[1] - m.gold[0]));
     if (_isVip) gold = Math.round(gold * 1.25); // VIP +25% gold
+    // Anel da Fortuna: +10% ouro se equipado
+    const _hasGoldRing = Object.values(G.equipment||{}).some(eId => eId && basePureId(eId) === 'ring_fortune');
+    if (_hasGoldRing) gold = Math.round(gold * 1.10);
     let xp = Math.round(m.xp[0] + Math.random() * (m.xp[1] - m.xp[0]));
     xp = Math.round(xp * (1 + (G.xpBonus||0)));
     // HP reflects real remaining HP from combat
     G.hp = Math.max(1, Math.round(finalHp));
     // Gold and missions counter handled below — but only outside party
     const _isPartyLead = (_partyState && _partyState.party && _partyState.party.leader === AUTH.username);
-    if (!_isPartyLead) {
+    const _isClanOrRaid = m.type === 'clan' || m.type === 'raid';
+    // Don't apply gold/stats locally for clan/party — handled by distribute route
+    if (!_isPartyLead && !_isClanOrRaid) {
       G.gold += gold;
+      G.stats.missions = (G.stats.missions||0) + 1;
+      G.stats.kills    = (G.stats.kills||0) + 1;
+    } else if (_isClanOrRaid) {
+      // Stats only locally (kills/missions) — gold via server
       G.stats.missions = (G.stats.missions||0) + 1;
       G.stats.kills    = (G.stats.kills||0) + 1;
     }
@@ -3978,31 +4253,14 @@ function finalizeCombat(won, m, enemyName, finalHp, clog) {
       }
     }).catch(() => {});
 
-    // Check if player is in a party — if so, distribute through server
-    if (_partyState && _partyState.party && _partyState.party.leader === AUTH.username) {
-      // Leader distributes — server handles all member XP/gold
-      api('POST', '/api/party/distribute', {
-        totalXp: xp,
-        totalGold: gold,
-        missionName: m.name
-      }).then(res => {
-        if (res && res.ok) {
-          // Reload my own state to get my share
-          api('GET', '/api/load').then(lr => {
-            if (lr.gameState) { G = lr.gameState; updateUI(); }
-          });
-        }
-      }).catch(()=>{});
-      // Skip the local gainXP — server already added our share
-      addLog('🤝 Recompensas distribuídas para a party!','good');
-    } else if (_partyState && _partyState.party) {
-      // Non-leader members shouldn't trigger missions for others — but if they do solo missions, no party share
-      gainXP(xp);
-    } else {
-      gainXP(xp);
-    }
+    // ── DISTRIBUIÇÃO DE XP / OURO / DROP ────────────────────────────────
+    // Determines who gets what based on mission type and party state
 
-    // Item drop
+    const isClanMission  = m.type === 'clan' || m.type === 'raid';
+    const isInParty      = _partyState && _partyState.party;
+    const isPartyLeader  = isInParty && _partyState.party.leader === AUTH.username;
+
+    // Item drop — always goes to the player who completed the mission
     const dropped = rollItemDrop(m);
     let dropMsg = '';
     if (dropped) {
@@ -4011,10 +4269,46 @@ function finalizeCombat(won, m, enemyName, finalHp, clog) {
       const grade = ITEM_GRADES[dropped.grade] || ITEM_GRADES.normal;
       dropMsg = ' | 🎁 ' + dropped.name;
       clog('🎁 DROP: ' + dropped.name + ' [' + grade.label + ']!', grade.color);
-      toast('🎁 Drop: ' + dropped.name + '!', 'good');
+      toast('🎁 Drop: ' + dropped.name + ' [' + grade.label + ']!', 'good');
       addLog('🎁 Drop: ' + dropped.name + ' [' + grade.label + ']', 'info');
     }
-    // HP warning after combat
+
+    if (isPartyLeader) {
+      // ── PARTY LEADER: distribute via server ──────────────────────────
+      api('POST', '/api/party/distribute', {
+        totalXp: xp, totalGold: gold, missionName: m.name
+      }).then(res => {
+        if (res && res.ok) {
+          api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
+        }
+      }).catch(() => {});
+      addLog('🤝 Recompensas distribuídas para a party!', 'good');
+
+    } else if (isClanMission && G.clanName) {
+      // ── CLAN MISSION: distribute XP + gold equally via server ────────
+      api('POST', '/api/clan/mission/distribute', {
+        totalXp: xp, totalGold: gold, missionName: m.name, missionId: m.id
+      }).then(res => {
+        if (res && res.ok) {
+          const myXp   = res.myShare ? res.myShare.xp   : xp;
+          const myGold = res.myShare ? res.myShare.gold  : gold;
+          clog('🛡 XP de clã distribuído! Você recebeu +' + myXp + ' XP e +' + myGold + ' ouro', 'var(--purple-light)');
+          api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
+        } else {
+          // Fallback: apply locally if server call fails
+          G.gold += gold;
+          gainXP(xp);
+        }
+      }).catch(() => { G.gold += gold; gainXP(xp); });
+      addLog('🛡 Missão de clã "' + m.name + '" completada! Distribuindo recompensas...', 'good');
+
+    } else {
+      // ── SOLO (or party non-leader): apply locally ─────────────────────
+      G.gold += gold;
+      gainXP(xp);
+    }
+
+    // HP warning
     const hpPct = Math.round(G.hp / G.hpMax * 100);
     const hpMsg = hpPct < 30 ? ' ⚠️ HP baixo (' + G.hp + '/' + G.hpMax + ')!' : '';
     clog('✅ VITÓRIA! +' + gold + ' ouro | +' + xp + ' XP' + dropMsg + hpMsg, 'var(--green-light)');
@@ -4025,34 +4319,43 @@ function finalizeCombat(won, m, enemyName, finalHp, clog) {
 
   } else {
     // ── DERROTA — HP zerou em combate ────────────────────────────────────
-    // HP is already 0 from combat loop — set to 0 for real
     G.hp = 0;
 
-    // Perde stats aleatórios (-5 a -15 em 1 ou 2 stats)
+    // Stat loss: 1 or 2 random stats, 5–10 points each
     const STATS = ['str','dex','mag','res'];
     const lostStats = [];
-    const numLost = Math.random() < 0.4 ? 2 : 1; // 40% chance de perder 2 stats
+    const numLost = Math.random() < 0.4 ? 2 : 1;
     for (let i = 0; i < numLost; i++) {
       const stat = STATS[Math.floor(Math.random() * STATS.length)];
-      const loss = Math.floor(Math.random() * 6) + 5; // 5 a 10
+      const loss = Math.floor(Math.random() * 6) + 5;
       G[stat] = Math.max(1, (G[stat]||1) - loss);
       lostStats.push(stat.toUpperCase() + ' -' + loss);
     }
 
-    // Crime: vai para a prisão
+    // Infirmary: 10 min KO after mission death (same as PvP loss)
+    G.knockedOutUntil = Date.now() + 10 * 60 * 1000;
+
+    // Crime: jail too
     if (m.jail && m.type === 'crime') {
       G.jailUntil = Date.now() + m.jailTime * 1000;
-      clog('🔒 PRESO! Cumpra ' + m.jailTime + 's antes de jogar.', 'var(--red-light)');
+      clog('🔒 PRESO! ' + m.jailTime + 's na cadeia.', 'var(--red-light)');
       toast('🔒 Preso! ' + m.jailTime + 's', 'bad');
     }
 
-    const statMsg = lostStats.length ? ' | Perdeu: ' + lostStats.join(', ') : '';
-    clog('💀 DERROTA! HP zerou! Você caiu em batalha!' + statMsg, 'var(--red-light)');
-    clog('⚠️ Recupere HP na Taverna antes de entrar em batalha fraco!', '#d0a040');
-    addLog('💀 Derrota em "' + m.name + '" — HP zerou.' + statMsg, 'bad');
-    document.getElementById('combat-result').textContent = '💀 Derrotado! HP zerou. ' + (lostStats.length ? lostStats.join(', ') : '');
-    document.getElementById('combat-result').style.color = 'var(--red-light)';
-    toast('💀 Derrotado! HP zerou.' + (lostStats.length ? ' ' + lostStats.join(', ') : ''), 'bad');
+    const statMsg = lostStats.length ? lostStats.join(', ') : '';
+    clog('💀 DERROTA! HP zerou! Você caiu em batalha!', 'var(--red-light)');
+    if (statMsg) clog('📉 Perdeu: ' + statMsg, 'var(--red-light)');
+    clog('🏥 Você está na Enfermaria por 10 minutos.', '#d0a040');
+    addLog('💀 Derrota em "' + m.name + '" — ' + statMsg + '. 🏥 KO 10min.', 'bad');
+    const resultEl = document.getElementById('combat-result');
+    if (resultEl) {
+      resultEl.innerHTML =
+        '<div style="color:var(--red-light);font-weight:700">💀 Derrotado! HP zerou.</div>'
+        + (statMsg ? '<div style="font-size:12px;color:var(--red-light);margin-top:4px">📉 Perdeu: ' + statMsg + '</div>' : '')
+        + '<div style="font-size:12px;color:#d0a040;margin-top:6px">🏥 Enfermaria por 10 minutos — vá à Taverna para se recuperar</div>';
+      resultEl.style.color = '';
+    }
+    toast('💀 Derrotado! ' + (statMsg ? statMsg + '. ' : '') + '🏥 KO 10min.', 'bad');
   }
 
   randomizeCloseButton();
@@ -4075,10 +4378,13 @@ function closeCombat() {
 const ZONE_TIER = {mirkwood:1, angmar:2, gondor:3, minas:4, erebor:5, mordor:6, khazad:7, doldur:8, valinor:9, void:10};
 
 function rollItemDrop(m) {
+  // VIP +10% drop bonus applied to base chance
+  const _vipDrop = (G.vipUntil && G.vipUntil > Date.now()) ? 0.10 : 0;
   const diff = m.diff || 'easy';
-  // Total drop chance per difficulty
-  const totalChance = {easy:0.40, med:0.55, hard:0.65, epic:0.80}[diff] || 0.40;
+  // Total drop chance per difficulty (+ VIP bonus)
+  const totalChance = Math.min(0.95, ({easy:0.40, med:0.55, hard:0.65, epic:0.80}[diff] || 0.40) + _vipDrop);
   if (Math.random() > totalChance) return null;
+
 
   // Determine what kind of drop (60% common, 30% normal item, 10% set piece)
   const roll = Math.random();
@@ -4174,9 +4480,9 @@ const CLASS_LEVEL_GAINS = {
 };
 
 function gainXP(amount) {
-  // VIP bonus: +50% XP
+  // VIP bonus: +10% XP
   const isVip = G.vipUntil && G.vipUntil > Date.now();
-  if (isVip) amount = Math.round(amount * 1.5);
+  if (isVip) amount = Math.round(amount * 1.10);
   G.xp += amount;
   while (G.xp >= G.xpNext) {
     G.xp -= G.xpNext;
@@ -4375,7 +4681,19 @@ function showCreateCharacter(username) {
   document.getElementById('create-username').textContent = username;
   showScreen('screen-create');
 }
-async function createCharacter() {
+async function createCharacterWithVip() {
+  // Initiate PIX for VIP — open shop first, then create character
+  const nameVal = document.getElementById('inp-char-name').value.trim();
+  if (!nameVal) {
+    document.getElementById('inp-char-name').classList.add('err');
+    setTimeout(() => document.getElementById('inp-char-name').classList.remove('err'), 2000);
+    return;
+  }
+  // Create character first, then redirect to VIP purchase in shop
+  await createCharacter(true); // true = vip pending
+}
+
+async function createCharacter(vipPending) {
   const nameVal = document.getElementById('inp-char-name').value.trim();
   if (!nameVal) {
     document.getElementById('inp-char-name').classList.add('err');
@@ -4385,10 +4703,12 @@ async function createCharacter() {
   const btn = document.querySelector('.btn-create');
   if (btn) { btn.disabled = true; btn.textContent = 'Criando...'; }
 
-  // Build state with name guaranteed
+  // Build state — grant 30 min free VIP to ALL new characters
   G = defaultState(nameVal, selectedRace);
+  G.vipUntil = Date.now() + 30 * 60 * 1000; // 30 minutes free VIP
+  applyVipBonuses(G); // apply VIP bonuses to starting stats
 
-  // Save BEFORE entering game — confirm it worked
+  // Save
   const res = await api('POST', '/api/save', { gameState: G });
   if (res.error) {
     toast('Erro ao salvar personagem: ' + res.error, 'bad');
@@ -4396,18 +4716,80 @@ async function createCharacter() {
     return;
   }
 
-  // Verify the save by loading back
+  // Verify
   const verify = await api('GET', '/api/load');
   if (!verify.gameState || !verify.gameState.name) {
     toast('Erro na verificação do personagem. Tente novamente.', 'bad');
     if (btn) { btn.disabled = false; btn.textContent = '⚔ Entrar no Reino'; }
     return;
   }
-  G = verify.gameState; // use the server's version
+  G = verify.gameState;
 
   showScreen('screen-game');
   initGame();
-  toast('⚔ Bem-vindo, ' + G.name + '!', 'info');
+
+  // Welcome + free VIP notification
+  setTimeout(() => {
+    toast('⚔ Bem-vindo, ' + G.name + '!', 'good');
+    setTimeout(() => {
+      showModal(
+        '🎁 VIP Grátis Ativado!',
+        '<div style="text-align:center">'
+        + '<div style="font-size:40px;margin-bottom:8px">👑</div>'
+        + '<div style="font-family:Cinzel,serif;font-size:15px;color:#c090e0;margin-bottom:8px">Você ganhou 30 minutos de VIP!</div>'
+        + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">Aproveite os bônus exclusivos durante sua jornada inicial.</div>'
+        + '<div style="background:rgba(100,50,160,.15);border:1px solid rgba(160,100,220,.4);border-radius:var(--radius);padding:12px;font-size:12px;line-height:2;text-align:left">'
+        +   '✨ <b>+10 Estamina Máxima</b><br>'
+        +   '📈 <b>+10% XP</b> em todas as missões<br>'
+        +   '🎁 <b>+10% chance</b> de drop de itens<br>'
+        +   '⚔ <b>+5 pontos</b> em todos os atributos por nível<br>'
+        +   '👑 <b>Ícone VIP</b> ao lado do seu nick'
+        + '</div>'
+        + '<div style="margin-top:12px;font-size:12px;color:var(--text-muted)">Para continuar com VIP após os 30 min:<br><b style="color:#c090e0">R$ 9,90/mês</b> na Loja do Reino.</div>'
+        + '</div>',
+        [
+          { label: '🛒 Ver VIP na Loja', cls:'btn-gold', fn: () => {
+            closeModal();
+            setTimeout(() => {
+              const shopNav = document.querySelector('[data-page="loja-real"]');
+              if (shopNav) navTo(shopNav);
+              setTimeout(() => {
+                const vipTab = document.querySelector('#page-loja-real .tab:nth-child(3)');
+                if (vipTab) shopRealTab(vipTab, 'vip');
+              }, 300);
+            }, 100);
+          }},
+          { label: '⚔ Jogar Agora', fn: closeModal }
+        ]
+      );
+    }, 800);
+  }, 300);
+}
+
+// Apply VIP stat bonuses to a gameState object (called on create + on login if VIP active)
+function applyVipBonuses(g) {
+  if (!g) return;
+  // +10 stamina max
+  g.stamMax = (g.stamMax || 10) + 10;
+  g.stam    = Math.min(g.stam || 0, g.stamMax);
+  // +5 per attribute (at level 1 = +5 flat)
+  const lvBonus = Math.max(1, g.level || 1) * 5;
+  g.str = (g.str || 10) + lvBonus;
+  g.dex = (g.dex || 10) + lvBonus;
+  g.mag = (g.mag || 10) + lvBonus;
+  g.res = (g.res || 10) + lvBonus;
+}
+
+// Remove VIP stat bonuses (called when VIP expires)
+function removeVipBonuses(g) {
+  if (!g) return;
+  g.stamMax = Math.max(5, (g.stamMax || 10) - 10);
+  g.stam    = Math.min(g.stam || 0, g.stamMax);
+  const lvBonus = Math.max(1, g.level || 1) * 5;
+  g.str = Math.max(1, (g.str || 10) - lvBonus);
+  g.dex = Math.max(1, (g.dex || 10) - lvBonus);
+  g.mag = Math.max(1, (g.mag || 10) - lvBonus);
+  g.res = Math.max(1, (g.res || 10) - lvBonus);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4420,7 +4802,11 @@ function initGame() {
   setTimeout(registerTavernSSEHandlers, 1200);
   setTimeout(registerPartySSEHandlers, 1300);
   setTimeout(registerShopSSEHandlers, 1400);
+  setTimeout(registerAssassinSSEHandlers, 1500);
+  setTimeout(registerRaidSSEHandlers, 1600);
+  setTimeout(registerClanMissionSSEHandler, 1700);
   setTimeout(loadPartyState, 1500);
+  setTimeout(loadServerAssassin, 2000);
   if (!G.friends) G.friends = [];
   updateUI();
   // Explicitly set name/class again after a tick to ensure DOM is ready
@@ -5050,10 +5436,11 @@ function renderForgeItemList() {
     return;
   }
   el.innerHTML = inv.map(invId => {
-    const pureBase = baseInvId(invId);
+    const withoutLucky = baseInvId(invId);    // strips !lucky, keeps +N
+    const pureBase     = basePureId(invId);   // strips both → base item id
     const it = findItem(invId);
     if (!it) return '';
-    const refine = getRefineLevel(pureBase);
+    const refine = getRefineLevel(withoutLucky);  // reads +N correctly
     const lucky = isLuckyItem(invId);
     const grade = ITEM_GRADES[it.grade] || ITEM_GRADES.normal;
     const isSelected = forgeSelectedInvId === invId;
@@ -5208,7 +5595,12 @@ function renderForgeActionArea(currentRefine) {
 function doForge() {
   if (!forgeSelectedInvId || !forgeSelectedStoneId) { toast('Selecione item e pedra!','bad'); return; }
   const invId = forgeSelectedInvId;
-  const pureBase = baseInvId(invId);
+  // BUG FIX: basePureId strips BOTH lucky AND +N suffix → gets the real base id
+  // baseInvId only strips lucky, so getRefineLevel(baseInvId('ew1+1!lucky')) = 1 ✓
+  // but getRefineLevel(baseInvId('ew1+1')) after 2nd forge would be wrong
+  // Using basePureId for the base + separate getRefineLevel on the withoutLucky version
+  const withoutLucky = baseInvId(invId);           // strips !lucky, keeps +N
+  const pureBase     = basePureId(invId);           // strips both !lucky and +N → "ew1"
   const it = findItem(invId);
   const stone = FORGE_STONES[forgeSelectedStoneId];
   if (!it || !stone) return;
@@ -5218,7 +5610,7 @@ function doForge() {
   if (sIdx < 0) { toast('Pedra não encontrada!','bad'); return; }
   G.consumables.splice(sIdx, 1);
 
-  const currentRefine = getRefineLevel(pureBase);
+  const currentRefine = getRefineLevel(withoutLucky);  // reads +N from actual invId
   const nextLevel = currentRefine + 1;
   const lucky = isLuckyItem(invId);
   const safe = isSafeStone(stone);
@@ -5322,12 +5714,11 @@ async function openPublicProfile(username) {
   const content = document.getElementById('profile-modal-content');
   overlay.style.display = 'flex';
   content.innerHTML = '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px">⏳ Carregando perfil...</div>';
-  document.getElementById('profile-modal-duel-btn').style.display = 'none';
-  document.getElementById('profile-modal-send-btn').style.display = 'none';
-  const _fbtn = document.getElementById('profile-modal-friend-btn');
-  const _mbtn = document.getElementById('profile-modal-msg-btn');
-  if (_fbtn) _fbtn.style.display='none';
-  if (_mbtn) _mbtn.style.display='none';
+  ['profile-modal-duel-btn','profile-modal-send-btn','profile-modal-friend-btn',
+   'profile-modal-msg-btn','profile-modal-clan-btn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
 
   const res = await api('GET', '/api/player/' + encodeURIComponent(username));
   if (res.error) { content.innerHTML = '<div style="color:var(--red-light);text-align:center;padding:24px">❌ ' + res.error + '</div>'; return; }
@@ -5359,6 +5750,15 @@ async function openPublicProfile(username) {
     if (!isMe) {
       document.getElementById('profile-modal-duel-btn').style.display = '';
       document.getElementById('profile-modal-send-btn').style.display = '';
+      const isFriend = (G.friends||[]).includes(username);
+      showProfileExtraButtons(username, isFriend);
+      // Clan invite on private profiles too
+      const clanBtnP = document.getElementById('profile-modal-clan-btn');
+      if (clanBtnP && G.clanRole === 'leader' && G.clanName && res.clanName !== G.clanName) {
+        clanBtnP.style.display = '';
+        clanBtnP.dataset.user = username;
+        clanBtnP.dataset.name = res.name || username;
+      }
     }
     return;
   }
@@ -5395,6 +5795,9 @@ async function openPublicProfile(username) {
         '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">' +
           '<span class="badge badge-gold">Nv. ' + res.level + '</span>' +
           (res.clanName ? '<span class="badge badge-purple">[' + (res.clanTag||'---') + '] ' + res.clanName + '</span>' : '<span class="badge badge-muted">Sem Clã</span>') +
+          (_serverAssassin && _serverAssassin.username === username
+            ? '<span style="background:rgba(180,40,40,.2);border:1px solid rgba(180,40,40,.6);color:#ff6060;padding:2px 8px;border-radius:3px;font-size:11px;font-family:Cinzel,serif">💀 Assassino do Servidor · ' + _serverAssassin.kills + ' kills</span>'
+            : '') +
           (crownHtml ? '<span style="font-size:11px;margin-left:4px">' + crownHtml + '</span>' : '') +
         '</div>' +
       '</div>' +
@@ -5438,6 +5841,22 @@ async function openPublicProfile(username) {
     document.getElementById('profile-modal-send-btn').style.display = '';
     const isFriend = (G.friends||[]).includes(username);
     showProfileExtraButtons(username, isFriend);
+
+    // Clan invite — show if current user is clan leader AND target is not in our clan
+    const clanBtn = document.getElementById('profile-modal-clan-btn');
+    if (clanBtn) {
+      const isLeader = G.clanRole === 'leader' && G.clanName;
+      const targetInMyClan = res.clanName && res.clanName === G.clanName;
+      const targetHasClan = !!res.clanName;
+      if (isLeader && !targetInMyClan) {
+        clanBtn.style.display = '';
+        clanBtn.dataset.user = username;
+        clanBtn.dataset.name = res.name;
+        clanBtn.title = targetHasClan
+          ? res.name + ' já tem um clã (' + res.clanName + ') — pode convidar mesmo assim'
+          : 'Convidar ' + res.name + ' para ' + G.clanName;
+      }
+    }
   }
 }
 
@@ -6347,31 +6766,57 @@ async function joinClanChat() {
 function showProfileExtraButtons(username, isFriend) {
   const friendBtn = document.getElementById('profile-modal-friend-btn');
   const msgBtn    = document.getElementById('profile-modal-msg-btn');
+  const actuallyFriend = isFriend || (G.friends||[]).includes(username.toLowerCase());
+
   if (friendBtn) {
-    if (isFriend || (G.friends||[]).includes(username)) {
-      friendBtn.style.display='none';
+    if (actuallyFriend) {
+      // Already friends — show "Solicitação enviada" or hide
+      friendBtn.style.display = 'none';
     } else {
-      friendBtn.style.display='';
+      friendBtn.style.display = '';
       friendBtn.dataset.user = username;
+      friendBtn.textContent = '👥 Adicionar Amigo';
+      friendBtn.disabled = false;
     }
   }
+
   if (msgBtn) {
-    if (isFriend || (G.friends||[]).includes(username)) {
-      msgBtn.style.display='';
-      msgBtn.dataset.user = username;
-    } else {
-      msgBtn.style.display='none';
-    }
+    // Show message button only if already friends
+    msgBtn.style.display = actuallyFriend ? '' : 'none';
+    if (actuallyFriend) msgBtn.dataset.user = username;
   }
 }
 
 function addFriendFromProfile() {
-  const username = document.getElementById('profile-modal-friend-btn')?.dataset.user;
+  const btn = document.getElementById('profile-modal-friend-btn');
+  const username = btn?.dataset.user;
   if (!username) return;
-  // Reuse existing sendFriendRequest with a synthetic button
-  sendFriendRequest({ dataset: { user: username } });
-  document.getElementById('profile-modal-friend-btn').style.display='none';
-  toast('✅ Solicitação enviada!','good');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  api('POST', '/api/friends/add', { targetUsername: username }).then(res => {
+    if (res.error) { toast(res.error,'bad'); btn.disabled=false; btn.textContent='👥 Adicionar Amigo'; return; }
+    btn.textContent = '✓ Solicitação enviada';
+    btn.style.opacity = '0.6';
+    btn.disabled = true;
+    toast('✅ Solicitação enviada para '+username+'!','good');
+  });
+}
+
+async function inviteToClanFromProfile() {
+  const btn = document.getElementById('profile-modal-clan-btn');
+  const targetUsername = btn?.dataset.user;
+  const targetName = btn?.dataset.name || targetUsername;
+  if (!targetUsername) return;
+  if (!G.clanName || G.clanRole !== 'leader') { toast('Apenas líderes podem convidar.','bad'); return; }
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Convidando...';
+  const res = await api('POST', '/api/clan/request-invite', { targetUsername });
+  btn.disabled = false;
+  if (res.error) { toast(res.error,'bad'); btn.textContent = orig; return; }
+  btn.textContent = '✓ Convite enviado';
+  btn.style.opacity = '0.6';
+  toast('🛡 Convite de clã enviado para '+targetName+'!','good');
 }
 
 async function msgFromProfile() {
@@ -6416,13 +6861,36 @@ function registerChatSSEHandlers() {
   // Clan join/kick events
   sseConn.addEventListener('clan_join_request', e => {
     const d = JSON.parse(e.data);
-    toast('📩 '+d.applicant+' quer entrar no clã!','info');
-    addLog('📩 Solicitação de '+d.applicant+' para entrar no clã.','info');
-    // Update badge
-    loadClanRequests(true);
-    // Refresh if on clan page
-    const clanPage = document.getElementById('page-clan');
-    if (clanPage && clanPage.classList.contains('active')) loadClanRequests(true);
+    if (d.isInvite) {
+      // Leader invited ME to join their clan — show accept/decline modal
+      showModal(
+        '🛡 Convite de Clã!',
+        '<b>'+(d.fromLeader||'O líder')+'</b> está te convidando para entrar no clã <b style="color:var(--gold)">'+(d.clanName)+'</b>!',
+        [
+          { label: '✕ Recusar', fn: async () => {
+            closeModal();
+            toast('Convite recusado.','info');
+          }},
+          { label: '🛡 Aceitar', cls:'btn-gold', fn: async () => {
+            closeModal();
+            const res = await api('POST', '/api/clan/request', { clanName: d.clanName });
+            if (res.error) { toast(res.error,'bad'); return; }
+            if (res.joined) {
+              G.clanName = d.clanName; G.clanTag = res.clanTag; G.clanRole = 'member';
+              toast('🛡 Entrou no clã '+d.clanName+'!','good');
+              updateUI(); forceSave();
+            }
+          }}
+        ]
+      );
+    } else {
+      // Someone requested to join MY clan
+      toast('📩 '+d.applicant+' quer entrar no clã!','info');
+      addLog('📩 Solicitação de '+d.applicant+' para entrar no clã.','info');
+      loadClanRequests(true);
+      const clanPage = document.getElementById('page-clan');
+      if (clanPage && clanPage.classList.contains('active')) loadClanRequests(true);
+    }
   });
   sseConn.addEventListener('clan_member_joined', e => {
     const d = JSON.parse(e.data);
@@ -6512,22 +6980,48 @@ function registerChatSSEHandlers() {
 let _infirmaryTimerInt = null;
 
 function updateInfirmaryBanner() {
-  const banner = document.getElementById('tav-infirmary-banner');
-  const timerEl = document.getElementById('tav-infirmary-timer');
-  if (!banner) return;
+  const banner    = document.getElementById('tav-infirmary-banner');
+  const timerEl   = document.getElementById('tav-infirmary-timer');
+  const globalInd = document.getElementById('global-infirmary-indicator');
+  const globalTimer = document.getElementById('global-ko-timer');
   const ko = G.knockedOutUntil && G.knockedOutUntil > Date.now();
-  banner.style.display = ko ? '' : 'none';
-  if (!ko) { clearInterval(_infirmaryTimerInt); return; }
-  // Countdown
+
+  // Local taverna banner
+  if (banner) banner.style.display = ko ? '' : 'none';
+
+  // Global topbar indicator
+  if (globalInd) globalInd.style.display = ko ? 'flex' : 'none';
+
+  // Also block mission start if KO (handled by isKnockedOut())
+  if (!ko) {
+    clearInterval(_infirmaryTimerInt);
+    if (G.knockedOutUntil > 0) { G.knockedOutUntil = 0; scheduleSave(); }
+    return;
+  }
+
   clearInterval(_infirmaryTimerInt);
   const tick = () => {
     const left = Math.max(0, (G.knockedOutUntil||0) - Date.now());
-    if (!left) { G.knockedOutUntil=0; updateInfirmaryBanner(); updateUI(); clearInterval(_infirmaryTimerInt); return; }
-    const m = Math.floor(left/60000), s = Math.floor((left%60000)/1000);
-    if (timerEl) timerEl.textContent = m+':'+String(s).padStart(2,'0');
+    if (!left) {
+      G.knockedOutUntil = 0;
+      clearInterval(_infirmaryTimerInt);
+      updateInfirmaryBanner();
+      updateUI();
+      toast('✨ Recuperado! Pronto para batalhar novamente.', 'good');
+      return;
+    }
+    const mins = Math.floor(left/60000), secs = Math.floor((left%60000)/1000);
+    const timeStr = mins+':'+String(secs).padStart(2,'0');
+    if (timerEl)    timerEl.textContent = timeStr;
+    if (globalTimer) globalTimer.textContent = '🏥 '+timeStr;
   };
   tick();
   _infirmaryTimerInt = setInterval(tick, 1000);
+}
+
+function navToTaverna() {
+  const nav = document.querySelector('[data-page="taverna"]');
+  if (nav) navTo(nav);
 }
 
 async function reviveNow() {
@@ -6596,14 +7090,46 @@ async function attackTavernPlayer(btn) {
         const res = await api('POST', '/api/tavern/duel', { targetUsername });
         if (res.error) { toast(res.error, 'bad'); return; }
         const won = res.winner === AUTH.username;
-        if (won) {
-          toast('⚔ Vitória! +10 '+res.winStat.toUpperCase()+'!', 'good');
-        } else {
-          toast('💀 Derrota! -10 '+res.loseStat.toUpperCase()+'. Enfermaria por 10 min.', 'bad');
-        }
-        // Reload game state to get updated stats + knockedOut
+        const myStat  = won ? res.winStat  : res.loseStat;
+        const myDelta = won ? '+10' : '-10';
+        const myColor = won ? 'var(--green-light)' : 'var(--red-light)';
+        const icon    = won ? '🏆' : '💀';
+
+        // Reload state FIRST so we have correct values
         const lr = await api('GET', '/api/load');
-        if (lr.gameState) { G = lr.gameState; updateUI(); }
+        if (lr.gameState) { G = lr.gameState; }
+
+        // Show result modal with clear stat change info
+        showModal(
+          icon + (won ? ' Vitória!' : ' Derrota!'),
+          '<div style="text-align:center">'
+          + '<div style="font-size:32px;margin-bottom:8px">'+(won?'🏆':'💀')+'</div>'
+          + (won
+            ? '<div style="font-size:15px;color:var(--green-light);font-weight:700;margin-bottom:8px">Você venceu '+targetName+'!</div>'
+            : '<div style="font-size:15px;color:var(--red-light);font-weight:700;margin-bottom:8px">Você foi derrotado por '+targetName+'!</div>')
+          + '<div style="font-size:13px;margin:12px 0;padding:10px;background:var(--bg-dark);border-radius:var(--radius)">'
+          +   '<div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">ALTERAÇÃO DE STATUS</div>'
+          +   '<div style="font-size:20px;font-weight:700;color:'+myColor+';font-family:Cinzel,serif">'
+          +     myDelta + ' ' + (myStat||'').toUpperCase()
+          +   '</div>'
+          + '</div>'
+          + (!won
+            ? '<div style="font-size:12px;color:var(--red-light);padding:8px;background:rgba(192,40,40,.1);border-radius:var(--radius)">'
+              + '🏥 Enfermaria por 10 minutos<br><small>Pague 3.000 ouro para sair antes</small>'
+              + '</div>'
+            : '')
+          + '</div>',
+          [{ label: won ? '✓ Continuar' : '🏥 Ver Enfermaria', cls: won ? 'btn-gold' : 'btn-red', fn: () => {
+            closeModal();
+            if (!won) {
+              // Navigate to taverna to show infirmary
+              const tavNav = document.querySelector('[data-page="taverna"]');
+              if (tavNav) navTo(tavNav);
+            }
+          }}]
+        );
+
+        updateUI();
         updateInfirmaryBanner();
         renderTavernPlayers();
         forceSave();
@@ -6613,19 +7139,96 @@ async function attackTavernPlayer(btn) {
 }
 
 
+function registerClanMissionSSEHandler() {
+  if (!sseConn) return;
+  sseConn.addEventListener('clan_mission_reward', e => {
+    const d = JSON.parse(e.data);
+    toast('🛡 '+d.completedBy+' completou "'+d.missionName+'"! +'+d.xp.toLocaleString()+' XP, +'+d.gold.toLocaleString()+' ouro ('+d.totalMembers+' membros)', 'good');
+    addLog('🛡 Clã "'+d.missionName+'": +'+d.xp+' XP, +'+d.gold+' ouro (1/'+d.totalMembers+')', 'good');
+    // Reload to apply XP/gold
+    api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState; updateUI();} });
+  });
+}
+
 function registerTavernSSEHandlers() {
   if (!sseConn) return;
+
+  // Passive regen from server — silently update HP/stam
+  sseConn.addEventListener('passive_regen', e => {
+    const d = JSON.parse(e.data);
+    // Update local state
+    G.hp   = d.hp;
+    G.stam = d.stam;
+    // Update UI bars without full re-render
+    const hpBar   = document.getElementById('p-hp-bar');
+    const hpTxt   = document.getElementById('p-hp-txt');
+    const stamBar = document.getElementById('p-stam-bar');
+    const stamTxt = document.getElementById('p-stam-txt');
+    const hudHp   = document.getElementById('hud-hp-bar');
+    const hudStam = document.getElementById('hud-stam-bar');
+    const hudHpLbl  = document.getElementById('hud-hp-label');
+    const hudStamLbl= document.getElementById('hud-stam-label');
+    const pct = (v, mx) => Math.round(Math.max(0, Math.min(100, v/mx*100))) + '%';
+    if (hpBar)    hpBar.style.width    = pct(G.hp, G.hpMax);
+    if (hpTxt)    hpTxt.textContent    = G.hp + ' / ' + G.hpMax;
+    if (stamBar)  stamBar.style.width  = pct(G.stam, d.stamMax);
+    if (stamTxt)  stamTxt.textContent  = G.stam + ' / ' + d.stamMax;
+    if (hudHp)    hudHp.style.width    = pct(G.hp, G.hpMax);
+    if (hudStam)  hudStam.style.width  = pct(G.stam, d.stamMax);
+    if (hudHpLbl)   hudHpLbl.textContent   = G.hp  + '/' + G.hpMax;
+    if (hudStamLbl) hudStamLbl.textContent = G.stam + '/' + d.stamMax;
+    // Subtle notification if HP was very low before
+    if (d.hp > 0 && (d.hp - 10) <= 0) {
+      toast('❤️ +10 HP regenerado passivamente', 'info');
+    }
+  });
+
   sseConn.addEventListener('tavern_duel_result', e => {
     const d = JSON.parse(e.data);
-    if (d.result === 'win') {
-      toast('⚔ Vitória no duelo contra '+d.vs+'! +10 '+d.stat.toUpperCase(),'good');
-      addLog('⚔ Ganhou duelo contra '+d.vs+'. +10 '+d.stat.toUpperCase(),'good');
+    const isWin = d.result === 'win';
+    const icon    = isWin ? '🏆' : '💀';
+    const statTxt = (d.stat||'').toUpperCase();
+    const delta   = isWin ? '+10 ' : '-10 ';
+    const color   = isWin ? 'var(--green-light)' : 'var(--red-light)';
+
+    // Log
+    if (isWin) {
+      addLog('⚔ Ganhou duelo contra '+d.vs+'. +10 '+statTxt,'good');
     } else {
-      toast('💀 Derrota no duelo contra '+d.vs+'! -10 '+d.stat.toUpperCase()+'. Enfermaria 10min.','bad');
-      addLog('💀 Perdeu duelo para '+d.vs+'. -10 '+d.stat.toUpperCase()+'. KO 10min.','bad');
+      addLog('💀 Perdeu duelo para '+d.vs+'. -10 '+statTxt+'. KO 10min.','bad');
     }
-    // Reload game state
-    api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState;updateUI();updateInfirmaryBanner();} });
+
+    // Reload state first
+    api('GET','/api/load').then(lr=>{
+      if (lr.gameState) { G = lr.gameState; updateUI(); updateInfirmaryBanner(); }
+
+      // Show modal with result
+      showModal(
+        icon + (isWin ? ' Vitória no Duelo!' : ' Derrota no Duelo!'),
+        '<div style="text-align:center">'
+        + '<div style="font-size:36px;margin-bottom:8px">'+(isWin?'🏆':'💀')+'</div>'
+        + (isWin
+          ? '<div style="font-size:14px;color:var(--green-light);font-weight:700;margin-bottom:8px">Você venceu '+d.vs+'!</div>'
+          : '<div style="font-size:14px;color:var(--red-light);font-weight:700;margin-bottom:8px">'+d.vs+' te derrotou!</div>')
+        + '<div style="font-size:13px;margin:12px 0;padding:10px;background:var(--bg-dark);border-radius:var(--radius)">'
+        +   '<div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">ALTERAÇÃO DE STATUS</div>'
+        +   '<div style="font-size:24px;font-weight:700;color:'+color+';font-family:Cinzel,serif">'+delta+statTxt+'</div>'
+        + '</div>'
+        + (!isWin
+          ? '<div style="font-size:12px;color:var(--red-light);padding:8px;background:rgba(192,40,40,.1);border-radius:var(--radius)">'
+            + '🏥 Você está na Enfermaria por 10 minutos<br><small>Vá à Taverna para pagar 3.000 ouro e sair antes</small>'
+            + '</div>'
+          : '')
+        + '</div>',
+        [{ label: isWin ? '✓ Continuar' : '🏥 Ir à Taverna', cls: isWin ? 'btn-gold' : 'btn-red', fn: () => {
+          closeModal();
+          if (!isWin) {
+            const tavNav = document.querySelector('[data-page="taverna"]');
+            if (tavNav) navTo(tavNav);
+          }
+        }}]
+      );
+    });
   });
 }
 
@@ -6775,6 +7378,7 @@ function randomizeCloseButton() {
 // PARTY SYSTEM
 // ══════════════════════════════════════════════════════════
 let _partyState = { party: null };
+let _serverAssassin = null; // { username, name, kills, race }
 
 const RACE_ICONS_PARTY = {elfo:'🧝',orc:'👹',anao:'⛏️',humano:'🧑‍⚔️',druida:'🌿',mago:'🧙'};
 
@@ -6994,15 +7598,24 @@ function updateVipBanner() {
   const isVip = G.vipUntil && G.vipUntil > Date.now();
   banner.style.display = isVip ? 'flex' : 'none';
   if (isVip && text) {
-    const d = new Date(G.vipUntil);
-    text.textContent = 'Ativo até ' + d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+    const remaining = G.vipUntil - Date.now();
+    if (remaining < 60 * 60 * 1000) {
+      // Less than 1 hour — show minutes
+      const mins = Math.ceil(remaining / 60000);
+      text.textContent = '⏳ Expira em ' + mins + ' minuto(s)';
+      text.style.color = 'var(--red-light)';
+    } else {
+      const d = new Date(G.vipUntil);
+      text.textContent = 'Ativo até ' + d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      text.style.color = '';
+    }
   }
 }
 
 function shopRealTab(el, tab) {
   document.querySelectorAll('#page-loja-real .tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
-  ['packs','gold','vip','stones'].forEach(t => {
+  ['packs','gold','vip','stones','emergency'].forEach(t => {
     const e = document.getElementById('shop-real-'+t);
     if (e) e.style.display = t===tab ? '' : 'none';
   });
@@ -7012,7 +7625,7 @@ function shopRealTab(el, tab) {
 function renderShopReal(tab) {
   const container = document.getElementById('shop-real-' + tab);
   if (!container) return;
-  const typeFilter = { packs:'pack', gold:'gold', vip:'vip', stones:'consumable' }[tab];
+  const typeFilter = { packs:'pack', gold:'gold', vip:'vip', stones:'consumable', emergency:'emergency' }[tab];
   const products = _shopProducts.filter(p => p.type === typeFilter);
 
   if (!products.length) {
@@ -7165,7 +7778,13 @@ function registerShopSSEHandlers() {
 
     // Reload state
     api('GET', '/api/load').then(lr => {
-      if (lr.gameState) { G = lr.gameState; updateUI(); updateVipBanner(); }
+      if (lr.gameState) {
+        G = lr.gameState;
+        updateUI();
+        updateVipBanner();
+        updateJailBanner();
+        updateInfirmaryBanner();
+      }
     });
   });
 }
@@ -7217,6 +7836,470 @@ async function doRecover() {
   }, 1500);
 }
 
+
+// ══════════════════════════════════════════════════════════
+// JAIL SYSTEM
+// ══════════════════════════════════════════════════════════
+let _jailTimerInt = null;
+
+function updateJailBanner() {
+  const banner   = document.getElementById('tav-jail-banner');
+  const timerEl  = document.getElementById('tav-jail-timer');
+  const globalInd = document.getElementById('global-jail-indicator');
+  const inJail = G.jailUntil && G.jailUntil > Date.now();
+  if (banner) banner.style.display = inJail ? '' : 'none';
+  if (globalInd) globalInd.style.display = inJail ? 'flex' : 'none';
+  if (!inJail) { clearInterval(_jailTimerInt); if (G.jailUntil > 0) { G.jailUntil = 0; scheduleSave(); } return; }
+  clearInterval(_jailTimerInt);
+  const tick = () => {
+    const left = Math.max(0, (G.jailUntil||0) - Date.now());
+    if (!left) { G.jailUntil=0; clearInterval(_jailTimerInt); updateJailBanner(); updateUI(); toast('🔓 Solto! Você saiu da cadeia.','good'); return; }
+    const m = Math.floor(left/60000), s = Math.floor((left%60000)/1000);
+    const t = m+':'+String(s).padStart(2,'0');
+    if (timerEl) timerEl.textContent = t;
+    const gEl = document.getElementById('global-jail-timer');
+    if (gEl) gEl.textContent = '🔒 '+t;
+  };
+  tick();
+  _jailTimerInt = setInterval(tick, 1000);
+}
+
+async function payBail() {
+  const res = await api('POST', '/api/crime/bail');
+  if (res.error) { toast(res.error,'bad'); return; }
+  G.jailUntil = 0;
+  G.gold = res.newBalance;
+  toast('⚖️ Fiança paga! Você está livre.','good');
+  addLog('⚖️ Pagou 10.000 ouro de fiança e saiu da cadeia.','info');
+  updateJailBanner(); updateUI(); forceSave();
+}
+
+function buyJailRelease() {
+  // Navigate to shop emergency tab
+  const shopNav = document.querySelector('[data-page="loja-real"]');
+  if (shopNav) { navTo(shopNav); }
+  setTimeout(() => {
+    const emergTab = document.querySelector('#page-loja-real .tab:last-child');
+    if (emergTab) shopRealTab(emergTab, 'emergency');
+  }, 200);
+  toast('🛒 Selecione "Fiança" na Loja do Reino','info');
+}
+
+function buyRevivePix() {
+  const shopNav = document.querySelector('[data-page="loja-real"]');
+  if (shopNav) navTo(shopNav);
+  setTimeout(() => {
+    const emergTab = document.querySelector('#page-loja-real .tab:last-child');
+    if (emergTab) shopRealTab(emergTab, 'emergency');
+  }, 200);
+  toast('🛒 Selecione "Cura" na Loja do Reino','info');
+}
+
+
+// ══════════════════════════════════════════════════════════
+// SERVER ASSASSIN — Client System
+// ══════════════════════════════════════════════════════════
+async function loadServerAssassin() {
+  const res = await api('GET', '/api/global/assassin');
+  if (res.error) return;
+  _serverAssassin = res.assassin; // null or { username, name, kills, race }
+  updateUI(); // refresh rank/hud if needed
+}
+
+function registerAssassinSSEHandlers() {
+  if (!sseConn) return;
+
+  // Someone gained/lost title (only for that person)
+  sseConn.addEventListener('server_assassin_changed', e => {
+    const d = JSON.parse(e.data);
+    if (d.gained) {
+      // I just became the assassin!
+      showModal(
+        '💀 Assassino do Servidor!',
+        '<div style="text-align:center">'
+        + '<div style="font-size:48px;margin-bottom:8px">💀</div>'
+        + '<div style="font-family:Cinzel,serif;font-size:16px;color:var(--red-light);margin-bottom:10px">Você é o Assassino do Servidor!</div>'
+        + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Você tem mais kills PvP que qualquer outro jogador nas Terras de Arathorn.</div>'
+        + '<div style="padding:12px;background:rgba(180,40,40,.1);border:1px solid rgba(180,40,40,.4);border-radius:var(--radius)">'
+        +   '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">BÔNUS ATIVOS</div>'
+        +   '<div style="font-size:18px;font-weight:700;color:var(--red-light);font-family:Cinzel,serif">+100 HP · +30 STR · +30 DEX · +30 MAG · +30 RES</div>'
+        + '</div>'
+        + '</div>',
+        [{label:'💀 Honra ao Assassino!', cls:'btn-red', fn: closeModal}]
+      );
+      toast('💀 Você é o Assassino do Servidor! Bônus ativados.','good');
+    } else if (d.lost) {
+      toast('💀 '+d.newAssassin+' tomou seu título de Assassino! Bônus removidos.','bad');
+      addLog('💀 Perdeu o título de Assassino para '+d.newAssassin+'.','bad');
+    }
+    // Reload state to get updated stats
+    api('GET','/api/load').then(lr=>{ if(lr.gameState){ G=lr.gameState; updateUI(); }});
+    loadServerAssassin();
+  });
+
+  // Broadcast — new assassin (everyone sees)
+  sseConn.addEventListener('server_assassin_update', e => {
+    const d = JSON.parse(e.data);
+    const prev = _serverAssassin;
+    _serverAssassin = { username: d.username, name: d.name, kills: d.kills };
+    // Only toast if it's a NEW person (not just kills count update)
+    if (!prev || prev.username !== d.username) {
+      if (d.username !== AUTH.username) { // don't double-toast for the assassin
+        toast('💀 Novo Assassino do Servidor: '+d.name+' ('+d.kills+' kills)!','info');
+        addLog('💀 '+d.name+' é o novo Assassino do Servidor com '+d.kills+' kills!','info');
+      }
+    }
+    updateUI(); // refresh rank row skull
+    // Refresh ranking if on that page
+    const rankPage = document.getElementById('page-ranking');
+    if (rankPage && rankPage.classList.contains('active')) renderRanking();
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════
+// SISTEMA DE RAID — Cliente
+// ══════════════════════════════════════════════════════════
+
+const RAID_DEFS = {
+  raid_duo: {
+    id:'raid_duo', slots:2, minLv:10, stam:3,
+    boss:{ name:'Trollano, o Devorador', icon:'👹', desc:'Um troll ancião que habita as cavernas do Norte.' },
+    gold:[3000,6000], xp:[2500,5000],
+    drops:'Pedras Prist + chance de Anel',
+    bonusChance:'30% Anel Raro',
+    cooldownMs: 2*60*60*1000
+  },
+  raid_trio: {
+    id:'raid_trio', slots:3, minLv:30, stam:4,
+    boss:{ name:'Vorgath, o Destruidor', icon:'🐲', desc:'Dragão corrompido pelo Olho de Sauron.' },
+    gold:[12000,25000], xp:[10000,20000],
+    drops:'Prist + Ravika + chance de Equipamento',
+    bonusChance:'25% Item Épico',
+    cooldownMs: 2*60*60*1000
+  },
+  raid_squad: {
+    id:'raid_squad', slots:4, minLv:60, stam:5,
+    boss:{ name:'Molkrath, o Imortal', icon:'💀', desc:'Lich Supremo que comanda legiões de mortos-vivos.' },
+    gold:[40000,80000], xp:[35000,65000],
+    drops:'Prist Reforçada + Ravika + item raro',
+    bonusChance:'20% Item Supremo',
+    cooldownMs: 2*60*60*1000
+  },
+  raid_full: {
+    id:'raid_full', slots:5, minLv:100, stam:6,
+    boss:{ name:"Zar'oth, o Deus Proibido", icon:'🌑', desc:'Entidade primordial banida para além do véu da realidade.' },
+    gold:[120000,250000], xp:[100000,200000],
+    drops:'Ravika Reforçada + Prist + Item Épico Garantido',
+    bonusChance:'15% Item Lendário',
+    cooldownMs: 2*60*60*1000
+  }
+};
+
+let _activeRaidRoom = null;
+let _raidCooldowns  = {};
+let _raidLobbyInterval = null;
+
+async function initRaids() {
+  if (!G.clanName) {
+    document.getElementById('raid-no-clan').style.display = '';
+    document.getElementById('raid-list').style.display = 'none';
+    document.getElementById('raid-lobby').style.display = 'none';
+    return;
+  }
+  document.getElementById('raid-no-clan').style.display = 'none';
+
+  // Load cooldowns
+  const cdRes = await api('GET', '/api/raid/cooldowns');
+  if (cdRes.cooldowns) _raidCooldowns = cdRes.cooldowns;
+
+  // If in active lobby, show it
+  if (_activeRaidRoom) {
+    showRaidLobby(_activeRaidRoom);
+    return;
+  }
+
+  document.getElementById('raid-lobby').style.display = 'none';
+  renderRaidList();
+}
+
+function renderRaidList() {
+  const list = document.getElementById('raid-list');
+  if (!list) return;
+  const isLeader = G.clanRole === 'leader';
+
+  list.innerHTML = Object.values(RAID_DEFS).map(r => {
+    const cdMs = _raidCooldowns[r.id] || 0;
+    const onCd = cdMs > 0;
+    const cdMin = Math.ceil(cdMs / 60000);
+    const locked = G.level < r.minLv;
+    const lockMsg = locked ? '🔒 Nível '+r.minLv+' necessário' : '';
+    const slotIcons = '👤'.repeat(r.slots);
+    const goldStr = r.gold[0].toLocaleString() + '–' + r.gold[1].toLocaleString();
+    const xpStr   = r.xp[0].toLocaleString()   + '–' + r.xp[1].toLocaleString();
+
+    return '<div class="raid-card' + (locked?' opacity-50':'') + '">'
+      + '<div class="raid-boss-icon">'+r.boss.icon+'</div>'
+      + '<div class="raid-boss-name">'+r.boss.name+'</div>'
+      + '<div class="raid-boss-desc">'+r.boss.desc+'</div>'
+      + '<div style="text-align:center;margin-bottom:10px">'
+      +   '<span class="raid-slots-badge">'+slotIcons+' '+r.slots+' Jogadores</span>'
+      +   ' <span style="font-size:11px;color:var(--text-muted)">Nv.'+r.minLv+'+ · ⚡-'+r.stam+' Estam</span>'
+      + '</div>'
+      + '<div class="raid-reward-row">'
+      +   '<span class="raid-reward-tag">⬡ '+goldStr+' ouro</span>'
+      +   '<span class="raid-reward-tag">✨ '+xpStr+' XP</span>'
+      +   '<span class="raid-reward-tag" style="color:var(--gold)">🎁 '+r.bonusChance+'</span>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:12px">'+r.drops+'</div>'
+      + (locked
+          ? '<div style="text-align:center;font-size:12px;color:var(--text-muted)">'+lockMsg+'</div>'
+          : onCd
+          ? '<div style="text-align:center"><div style="font-size:12px;color:var(--red-light)">⏳ Cooldown: '+cdMin+' min restantes</div>'
+            + '<div class="raid-cd-bar"><div class="raid-cd-fill" style="width:'+Math.min(100,cdMs/(2*60*60*1000)*100)+'%"></div></div></div>'
+          : isLeader
+          ? '<button class="btn btn-red" style="width:100%" data-raid="'+r.id+'" onclick="createRaidRoom(this)">⚔ Convocar para Raid</button>'
+          : '<div style="text-align:center;font-size:12px;color:var(--text-muted)">Aguarde seu líder convocar esta raid</div>'
+        )
+      + '</div>';
+  }).join('');
+}
+
+async function createRaidRoom(btn) {
+  const raidId = btn.dataset.raid;
+  btn.disabled = true;
+  btn.textContent = 'Convocando...';
+  const res = await api('POST', '/api/raid/create', { raidId });
+  btn.disabled = false;
+  if (res.error) { toast(res.error, 'bad'); renderRaidList(); return; }
+  toast('🌋 Raid criada! Aguardando membros...', 'good');
+  _activeRaidRoom = { id: res.roomId, raidId, ...res.raid };
+  showRaidLobby({ id: res.roomId, raidId, members:[{ username:AUTH.username, name:G.name, race:G.race, level:G.level }], maxSlots:res.raid.slots, status:'waiting' }, res.raid);
+}
+
+async function joinRaidRoom(roomId) {
+  const res = await api('POST', '/api/raid/join', { roomId });
+  if (res.error) { toast(res.error, 'bad'); return; }
+  _activeRaidRoom = { id: roomId };
+  const roomData = await api('GET', '/api/raid/room/'+roomId);
+  if (roomData.room) showRaidLobby(roomData.room, roomData.raidDef);
+  toast('🌋 Você entrou na raid!', 'good');
+  // Close any invite badge
+  const badge = document.getElementById('raid-badge');
+  if (badge) badge.style.display = 'none';
+}
+
+function showRaidLobby(room, raidDef) {
+  document.getElementById('raid-list').style.display = 'none';
+  document.getElementById('raid-lobby').style.display = '';
+  const rd = RAID_DEFS[room.raidId] || raidDef || {};
+  const boss = (raidDef && raidDef.boss) || rd.boss || {};
+  const isLeader = room.leader === AUTH.username;
+
+  se('raid-lobby-title', '🌋 Raid: ' + (boss.name || '—'));
+
+  // Boss card
+  const bossEl = document.getElementById('raid-lobby-boss');
+  if (bossEl) {
+    bossEl.innerHTML =
+      '<div style="font-size:48px;margin-bottom:6px">'+boss.icon+'</div>'
+      + '<div style="font-family:Cinzel,serif;color:var(--red-light);font-size:15px">'+boss.name+'</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-top:4px">'+boss.desc+'</div>';
+  }
+
+  // Members
+  const membersEl = document.getElementById('raid-lobby-members');
+  const RICONS = {elfo:'🧝',orc:'👹',anao:'⛏️',humano:'🧑‍⚔️',druida:'🌿',mago:'🧙'};
+  if (membersEl) {
+    membersEl.innerHTML = (room.members||[]).map(m => {
+      const isMe = m.username === AUTH.username;
+      return '<div class="raid-member-row">'
+        + '<span style="font-size:18px">'+(RICONS[m.race]||'👤')+'</span>'
+        + '<div style="flex:1"><div style="font-size:13px">'+m.name+(isMe?' <span style="font-size:10px;color:var(--text-muted)">(Você)</span>':'')+'</div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">Nv. '+m.level+'</div></div>'
+        + '<span style="color:var(--green-light);font-size:12px">✓ Pronto</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  // Slots indicator
+  const slotsEl = document.getElementById('raid-lobby-slots');
+  if (slotsEl) {
+    const filled = room.members ? room.members.length : 1;
+    const max = room.maxSlots || rd.slots || 2;
+    slotsEl.innerHTML = '👥 '+filled+'/'+max+' jogadores'
+      + (filled < 2 ? ' — <span style="color:var(--red-light)">Mínimo 2 para iniciar</span>' : '')
+      + (filled < max ? ' · Aguardando mais membros...' : ' — <span style="color:var(--green-light)">Sala cheia!</span>');
+  }
+
+  // Actions
+  const actEl = document.getElementById('raid-lobby-actions');
+  if (actEl) {
+    if (isLeader) {
+      const canStart = room.members && room.members.length >= 2;
+      actEl.innerHTML =
+        '<button class="btn btn-red" style="flex:1" '+(canStart?'':'disabled ')
+        +'data-room="'+room.id+'" onclick="startRaid(this.dataset.room)">⚔ Iniciar Raid'+(canStart?'':' (min. 2)')+' </button>'
+        +'<button class="btn btn-sm" onclick="leaveRaidLobby()">Cancelar</button>';
+    } else {
+      actEl.innerHTML = '<button class="btn btn-sm" onclick="leaveRaidLobby()">Sair da Sala</button>';
+    }
+  }
+}
+
+async function startRaid(roomId) {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⚔ Iniciando...';
+  const res = await api('POST', '/api/raid/start', { roomId });
+  if (res.error) { toast(res.error, 'bad'); btn.disabled=false; btn.textContent='⚔ Iniciar Raid'; return; }
+  // Show combat animation then resolve
+  runRaidCombat(roomId, res.room);
+}
+
+async function runRaidCombat(roomId, room) {
+  const rDef = RAID_DEFS[room.raidId] || {};
+  const boss = rDef.boss || {};
+
+  // Show combat screen adapted for raid
+  const cs = document.getElementById('combat-screen');
+  cs.classList.add('open');
+  se('c-player-icon', '⚔');
+  se('c-player-name', 'Clã '+G.clanName+' ('+room.members.length+' guerreiros)');
+  se('c-enemy-icon', boss.icon||'👹');
+  se('c-enemy-name', boss.name||'Boss');
+  se('combat-title', '🌋 RAID — '+boss.name);
+  document.getElementById('combat-result').textContent = '';
+  document.getElementById('btn-combat-close').style.display = 'none';
+  const logBox = document.getElementById('combat-log-box'); logBox.innerHTML = '';
+  const _wrap = document.getElementById('btn-combat-close-wrap');
+  if (_wrap) _wrap.style.display = 'none';
+
+  function clog(msg, color) {
+    const d=document.createElement('div'); d.className='c-log-line';
+    d.style.color=color||'var(--text-muted)'; d.textContent=msg; logBox.prepend(d);
+  }
+
+  clog('🌋 O clã enfrenta '+boss.name+'!', 'var(--gold)');
+  clog('👥 '+room.members.length+' guerreiros entram em batalha!', 'var(--text-secondary)');
+
+  // Simulate 5 rounds of combat log
+  const lines = [
+    '⚔ O clã avança em formação!',
+    '💥 Ataque combinado causa dano massivo ao boss!',
+    '🔥 '+boss.name+' contra-ataca com fúria!',
+    '🛡 Os guerreiros resistem e continuam avançando!',
+    '⚡ Golpe final coordenado — sorte do clã!'
+  ];
+  for (let i=0; i<lines.length; i++) {
+    await new Promise(r=>setTimeout(r, 600));
+    clog(lines[i], i===4?'var(--green-light)':'var(--text-secondary)');
+  }
+
+  await new Promise(r=>setTimeout(r, 800));
+
+  // Resolve with server
+  const res = await api('POST', '/api/raid/complete-v2', { roomId });
+  if (res.error) { toast(res.error,'bad'); closeCombat(); return; }
+
+  const won = res.won;
+  const winPct = res.winChance || 50;
+  if (won) {
+    clog('🏆 VITÓRIA! O clã derrotou '+boss.name+'!', 'var(--green-light)');
+    clog('⚡ Poder combinado: '+res.totalPower+' vs Boss: '+res.bossPower+' ('+winPct+'% chance)', 'var(--text-muted)');
+    document.getElementById('combat-result').innerHTML = '<span style="color:var(--green-light);font-size:15px">🏆 RAID VENCIDA!</span><br><span style="font-size:12px;color:var(--text-muted)">Drops distribuídos igualmente entre todos!</span>';
+  } else {
+    clog('💀 DERROTA! '+boss.name+' foi forte demais...', 'var(--red-light)');
+    clog('⚡ Poder: '+res.totalPower+' vs Boss: '+res.bossPower+' ('+winPct+'% chance)', 'var(--text-muted)');
+    document.getElementById('combat-result').innerHTML = '<span style="color:var(--red-light)">💀 Raid perdida.</span><br><span style="font-size:12px;color:var(--text-muted)">XP de consolação distribuído. Tente novamente em 2h.</span>';
+  }
+
+  randomizeCloseButton();
+  _activeRaidRoom = null;
+
+  // Reload state
+  api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState; updateUI();} });
+}
+
+function leaveRaidLobby() {
+  _activeRaidRoom = null;
+  document.getElementById('raid-lobby').style.display = 'none';
+  document.getElementById('raid-list').style.display = '';
+  initRaids();
+}
+
+function registerRaidSSEHandlers() {
+  if (!sseConn) return;
+
+  // Raid invite (non-leader members get this)
+  sseConn.addEventListener('raid_invite', e => {
+    const d = JSON.parse(e.data);
+    const rDef = RAID_DEFS[d.raidId] || {};
+    const badge = document.getElementById('raid-badge');
+    if (badge) { badge.style.display = ''; badge.textContent = '!'; }
+    showModal(
+      '🌋 Convocação para Raid!',
+      '<div style="text-align:center">'
+      + '<div style="font-size:40px;margin-bottom:8px">'+d.bossIcon+'</div>'
+      + '<div style="font-family:Cinzel,serif;font-size:14px;color:var(--red-light);margin-bottom:6px">'+d.bossName+'</div>'
+      + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">'
+      +   '<b>'+d.leaderName+'</b> está convocando para uma Raid de <b>'+d.slots+' jogadores</b>!'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);padding:8px;background:var(--bg-dark);border-radius:var(--radius)">'
+      +   '⚡ Nível mínimo: '+d.minLv+' · Drops exclusivos · XP em grupo'
+      + '</div></div>',
+      [
+        { label:'✕ Recusar', fn: closeModal },
+        { label:'⚔ Entrar na Raid!', cls:'btn-red', fn: async () => {
+          closeModal();
+          await joinRaidRoom(d.roomId);
+          const rNav = document.querySelector('[data-page="raids"]');
+          if (rNav) navTo(rNav);
+        }}
+      ]
+    );
+  });
+
+  // Room updated (someone joined)
+  sseConn.addEventListener('raid_room_update', e => {
+    const d = JSON.parse(e.data);
+    _activeRaidRoom = d.room;
+    const raidPage = document.getElementById('page-raids');
+    if (raidPage && raidPage.classList.contains('active')) {
+      showRaidLobby(d.room, d.raidDef);
+    }
+    toast('👤 '+d.room.members[d.room.members.length-1].name+' entrou na raid!', 'info');
+  });
+
+  // Raid started (non-leader members)
+  sseConn.addEventListener('raid_started', e => {
+    const d = JSON.parse(e.data);
+    if (d.members.find(m=>m.username===AUTH.username) && AUTH.username !== ((_activeRaidRoom&&_activeRaidRoom.leader)||'')) {
+      // Non-leader: show combat automatically
+      runRaidCombat(d.roomId, { raidId: d.raidId, members: d.members, id: d.roomId });
+    }
+  });
+
+  // Raid complete result (individual rewards)
+  sseConn.addEventListener('raid_complete', e => {
+    const d = JSON.parse(e.data);
+    if (d.won) {
+      const parts = ['+'+d.gold.toLocaleString()+' ouro', '+'+d.xp.toLocaleString()+' XP'];
+      if (d.stone)     parts.push('💎 '+d.stone);
+      if (d.bonusItem) parts.push('🎁 Item épico!');
+      toast('🏆 Raid vencida! '+parts.join(' · '),'good');
+      addLog('🏆 Raid '+d.bossName+': '+parts.join(', '),'good');
+    } else {
+      toast('💀 Raid '+d.bossName+' perdida. +'+d.xp+' XP consolação.','bad');
+      addLog('💀 Raid perdida: '+d.bossName,'bad');
+    }
+    // Refresh cooldowns
+    api('GET','/api/raid/cooldowns').then(r=>{ if(r.cooldowns) _raidCooldowns=r.cooldowns; });
+    api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState; updateUI();} });
+    const badge = document.getElementById('raid-badge');
+    if (badge) badge.style.display = 'none';
+  });
+}
+
 </script>
 
 <!-- PUBLIC PROFILE MODAL -->
@@ -7226,12 +8309,13 @@ async function doRecover() {
     <div id="profile-modal-content" style="padding:24px 28px">
       <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">Carregando...</div>
     </div>
-    <div style="padding:0 28px 20px;display:flex;gap:8px;justify-content:flex-end">
+    <div style="padding:0 28px 20px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
       <button class="btn" onclick="closeProfileModal()">Fechar</button>
       <button class="btn btn-green btn-sm" id="profile-modal-friend-btn" style="display:none" onclick="addFriendFromProfile()">👥 Adicionar Amigo</button>
       <button class="btn btn-sm" id="profile-modal-msg-btn" style="display:none" onclick="msgFromProfile()">💬 Mensagem</button>
-      <button class="btn btn-red btn-sm" id="profile-modal-duel-btn" style="display:none" onclick="challengeFromProfile()">⚔ Desafiar para Duelo</button>
-      <button class="btn btn-gold btn-sm" id="profile-modal-send-btn" style="display:none" onclick="sendGoldFromProfile()">💸 Enviar Ouro</button>
+      <button class="btn btn-sm" id="profile-modal-clan-btn" style="display:none;background:rgba(130,80,200,.2);border-color:rgba(130,80,200,.6);color:#c090e0" onclick="inviteToClanFromProfile()">🛡 Convidar para Clã</button>
+      <button class="btn btn-red btn-sm" id="profile-modal-duel-btn" style="display:none" onclick="challengeFromProfile()">⚔ Desafiar</button>
+      <button class="btn btn-gold btn-sm" id="profile-modal-send-btn" style="display:none" onclick="sendGoldFromProfile()">💸 Ouro</button>
     </div>
   </div>
 </div>
