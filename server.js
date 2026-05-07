@@ -1873,6 +1873,13 @@ async function handleRequest(req, res) {
   if (method === 'POST' && url === '/api/mission/complete') {
     const username = verifyToken(getToken(req));
     if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    // Server-side restriction check
+    const _dbCheck = loadDB();
+    const _gCheck  = _dbCheck.users[username] && _dbCheck.users[username].gameState;
+    if (_gCheck) {
+      if (_gCheck.jailUntil && _gCheck.jailUntil > Date.now()) { send(res,400,{error:'Voce esta preso!'}); return; }
+      if (_gCheck.knockedOutUntil && _gCheck.knockedOutUntil > Date.now()) { send(res,400,{error:'Voce esta na enfermaria!'}); return; }
+    }
     const { missionType } = await readBody(req);
     const db = loadDB();
     const user = db.users[username];

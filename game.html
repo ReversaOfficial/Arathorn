@@ -985,7 +985,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 <!-- ═══════════════════════════════════════════════════════
      INFIRMARY OVERLAY — Blocks all actions while KO
 ═══════════════════════════════════════════════════════ -->
-<div id="ko-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.88);display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
+<div id="ko-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.88);flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
   <div style="max-width:360px;width:100%">
     <div style="font-size:64px;margin-bottom:12px">🏥</div>
     <div style="font-family:'Cinzel',serif;font-size:20px;color:var(--red-light);margin-bottom:8px">Na Enfermaria</div>
@@ -3106,9 +3106,10 @@ function updateUI() {
     if (el) el.textContent = _fmtGold(G.gold || 0);
   });
   const _amAssassin = _serverAssassin && _serverAssassin.username === AUTH.username;
-  const _isVipNow = G.vipUntil && G.vipUntil > Date.now();
+  const _isVipNow   = G.vipUntil && G.vipUntil > Date.now();
   const _namePrefix = _amAssassin ? '💀 ' : (_isVipNow ? '👑 ' : '');
-  se('hud-name', _namePrefix + (G.name || '—'));
+  const _statusSuffix = isInJail() ? ' 🔒' : isKnockedOut() ? ' 🏥' : '';
+  se('hud-name', _namePrefix + (G.name || '—') + _statusSuffix);
   // Perfil
   ['p-avatar','rp-avatar'].forEach(id => se(id, icon));
   se('p-race-icon', icon);
@@ -3479,7 +3480,22 @@ function selectZone(id) {
 // MISSION HELPERS
 // ══════════════════════════════════════════════════════════
 function isKnockedOut() {
-  return G.knockedOutUntil && G.knockedOutUntil > Date.now();
+  return !!(G.knockedOutUntil && G.knockedOutUntil > Date.now());
+}
+function isInJail() {
+  return !!(G.jailUntil && G.jailUntil > Date.now());
+}
+// Single guard for any gameplay action
+function isRestricted(silent) {
+  if (isInJail()) {
+    if (!silent) toast('🔒 Você está preso! Pague a fiança ou aguarde.', 'bad');
+    return true;
+  }
+  if (isKnockedOut()) {
+    if (!silent) toast('🏥 Você está na enfermaria! Pague ou aguarde.', 'bad');
+    return true;
+  }
+  return false;
 }
 
 function getStamCost(m) {
@@ -4221,12 +4237,12 @@ function useConsumable(id) {
 // COMBAT
 // ══════════════════════════════════════════════════════════
 async function startMission(missionId) {
+  if (isRestricted()) return; // jailed or infirmary
   const m = MISSIONS.find(x => x.id === missionId);
   if (!m) return;
   if (G.stam < m.stam) { toast('⚡ Estamina insuficiente! Vá à Taverna.','bad'); return; }
   if (G.level < m.minLv) { toast('Nível '+m.minLv+' necessário!','bad'); return; }
   if (m.type === 'clan' && !G.clanName) { toast('Esta missão requer um clã!','bad'); return; }
-  if (isKnockedOut()) { toast('💀 Você está na Enfermaria! Recupere-se antes.','bad'); return; }
   if (m.type === 'crime') {
     if (Date.now() < (G.jailUntil||0)) { toast('🔒 Você está preso! Pague a fiança ou aguarde.','bad'); return; }
 
@@ -8426,6 +8442,7 @@ function renderRaidList() {
 }
 
 async function createRaidRoom(btn) {
+  if (isRestricted()) return;
   const raidId = btn.dataset.raid;
   btn.disabled = true;
   btn.textContent = 'Convocando...';
@@ -8438,6 +8455,7 @@ async function createRaidRoom(btn) {
 }
 
 async function joinRaidRoom(roomId) {
+  if (isRestricted()) return;
   const res = await api('POST', '/api/raid/join', { roomId });
   if (res.error) { toast(res.error, 'bad'); return; }
   _activeRaidRoom = { id: roomId };
