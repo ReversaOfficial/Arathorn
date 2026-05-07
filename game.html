@@ -1298,7 +1298,10 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 
       <!-- TAVERNA -->
       <div class="page" id="page-taverna">
-        <div class="page-title">🍺 Taverna</div>
+        <div class="page-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span>🍺 Taverna</span>
+          <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);border-radius:20px;padding:5px 14px;font-family:'Cinzel',serif;font-size:14px;color:var(--gold)">⬡ <span id="tav-gold-display" style="font-weight:700">0</span></div>
+        </div>
         <div style="background:linear-gradient(135deg,#1a0f08,#2a1a10);border:1px solid rgba(201,168,76,.2);border-radius:var(--radius-lg);padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
           <div style="flex:1">
             <div style="font-family:'Cinzel',serif;font-size:15px;color:var(--gold);margin-bottom:2px">🍻 O Javali Bêbado</div>
@@ -1356,7 +1359,10 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 
       <!-- FERREIRO -->
       <div class="page" id="page-loja">
-        <div class="page-title">⚒️ Ferreiro Gornak</div>
+        <div class="page-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span>⚒️ Ferreiro Gornak</span>
+          <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);border-radius:20px;padding:5px 14px;font-family:'Cinzel',serif;font-size:14px;color:var(--gold)">⬡ <span id="smith-gold-display" style="font-weight:700">0</span></div>
+        </div>
         <div class="page-sub">"Tudo que brilha pode matar. Sets raros — consiga via drop nas missões."</div>
         <div class="tabs">
           <div class="tab active" onclick="shopTab(this,'weapons')">⚔ Armas</div>
@@ -1843,7 +1849,10 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 
       <!-- LOJA REAL -->
       <div class="page" id="page-loja-real">
-        <div class="page-title">💎 Loja do Reino</div>
+        <div class="page-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span>💎 Loja do Reino</span>
+          <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);border-radius:20px;padding:5px 14px;font-family:'Cinzel',serif;font-size:14px;color:var(--gold)">⬡ <span id="realshop-gold-display" style="font-weight:700">0</span></div>
+        </div>
         <div class="page-sub">Apoie o jogo e ganhe vantagens exclusivas — pagamento via PIX instantâneo</div>
 
         <!-- VIP status banner -->
@@ -2164,6 +2173,10 @@ function scheduleSave() {
 
 // forceSave: salva na hora, sem debounce (usar em ações críticas)
 async function forceSave() {
+  // Store effective max values so server can use them for regen caps
+  const _eff = getEffectiveStats();
+  G.effectiveHpMax   = _eff.hpMax;
+  G.effectiveStamMax = _eff.stamMax;
   clearTimeout(saveTimer);
   await doSave();
 }
@@ -3028,7 +3041,7 @@ function updateUI() {
   se('hud-hp-label', G.hp + '/' + getEffectiveStats().hpMax);
   const mb = document.getElementById('hud-mana-bar'); if (mb) mb.style.width = pct(G.mana, G.manaMax);
   se('hud-mana-label', G.mana+'/'+G.manaMax);
-  const sb = document.getElementById('hud-stam-bar'); if (sb) sb.style.width = pct(G.stam, G.stamMax);
+  const sb = document.getElementById('hud-stam-bar'); if (sb) sb.style.width = pct(G.stam, getEffectiveStats().stamMax);
   const _hudEff = getEffectiveStats();
   se('hud-stam-label', G.stam + '/' + _hudEff.stamMax);
   // Knocked out indicator
@@ -3043,6 +3056,12 @@ function updateUI() {
     }
   }
   se('hud-gold', G.gold); se('hud-level', G.level);
+  // Update gold displays on page headers
+  const _fmtGold = g => g >= 1e6 ? (g/1e6).toFixed(1)+'M' : g >= 1e3 ? (g/1e3).toFixed(0)+'K' : String(g);
+  ['tav-gold-display','smith-gold-display','realshop-gold-display'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = _fmtGold(G.gold || 0);
+  });
   const _amAssassin = _serverAssassin && _serverAssassin.username === AUTH.username;
   const _isVipNow = G.vipUntil && G.vipUntil > Date.now();
   const _namePrefix = _amAssassin ? '💀 ' : (_isVipNow ? '👑 ' : '');
@@ -3156,7 +3175,9 @@ function updateUI() {
   // Equip slots
   updateEquipSlots();
   // Taverna
-  se('tav-stam', G.stam); se('tav-stam-max', G.stamMax);
+  // Taverna stam shows effective max (includes equip bonuses)
+  const _tavEff = getEffectiveStats();
+  se('tav-stam', G.stam); se('tav-stam-max', _tavEff.stamMax);
   se('tav-hp', G.hp); se('tav-hp-max', G.hpMax);
   // Zone
   const zone = ZONES.find(z => z.id === G.currentZone) || ZONES[0];
@@ -4013,7 +4034,7 @@ function buyTavern(id) {
   G.gold-=it.price;
   let msgs=[];
   if(it.fullHp){G.hp=G.hpMax;msgs.push('HP restaurado!');}
-  else{if(it.hp>0){G.hp=Math.min(G.hpMax,G.hp+it.hp);msgs.push('+'+it.hp+' HP');}if(it.stam>0){G.stam=Math.min(G.stamMax,G.stam+it.stam);msgs.push('+'+it.stam+' estamina');}}
+  else{if(it.hp>0){G.hp=Math.min(getEffectiveStats().hpMax,G.hp+it.hp);msgs.push('+'+it.hp+' HP');}if(it.stam>0){G.stam=Math.min(getEffectiveStats().stamMax,G.stam+it.stam);msgs.push('+'+it.stam+' estamina');}}
   addLog('🍺 '+it.name+' — '+msgs.join(', '),'info');
   toast('🍺 '+msgs.join(', '),'info');
   updateUI(); renderTavern();
@@ -4054,14 +4075,20 @@ function unequipItem(invId) {
   const refStr = refine > 0 ? ' [+'+refine+']' : '';
   // Remove from equipment slot
   G.equipment[foundSlot] = null;
+  // After removing, recalculate effective stats and cap current values
+  const _unEff = getEffectiveStats();
+  // Cap stam to new (lower) effective max
+  if (G.stam > _unEff.stamMax) {
+    G.stam = _unEff.stamMax;
+  }
+  // Cap HP to new effective max (in case item gave HP bonus)
+  if (G.hp > _unEff.hpMax) {
+    G.hp = _unEff.hpMax;
+  }
   addLog('↩ Desequipou: ' + name + refStr, 'info');
   toast('↩ ' + name + refStr + ' desequipado.', 'info');
   updateUI();
   renderInventory('equip');
-  // If stam necklace removed, cap stam to base max
-  if (basePureId(invId) === 'neck_endurance' && G.stam > G.stamMax) {
-    G.stam = G.stamMax;
-  }
   forceSave();
 }
 
@@ -4092,6 +4119,13 @@ function equipItem(id) {
   G.equipment[it.slot] = id;
   addLog('⚔ Equipou: ' + it.name + (getRefineLevel(baseInvId(id)) > 0 ? ' [+'+getRefineLevel(baseInvId(id))+']' : ''), 'good');
   toast('✅ ' + it.name + ' equipado!', 'good');
+  // After equipping, recalculate effective stats
+  // If stamMax increased, allow current stam to benefit (don't force regen — just allow it)
+  // If HP max increased, HP stays as-is (will regen up naturally)
+  const _afterEff = getEffectiveStats();
+  // If new stamMax is higher than current stam, that's fine — regen will fill it
+  // But ensure stam doesn't exceed new max
+  if (G.stam > _afterEff.stamMax) G.stam = _afterEff.stamMax;
   updateUI(); renderInventory(); renderShop();
   forceSave();
 }
@@ -4113,8 +4147,8 @@ function useConsumable(id) {
   const it=ALCH_ITEMS.find(a=>a.id===id); if(!it)return;
   G.consumables.splice(idx,1);
   let msgs=[];
-  if(it.hp>0){G.hp=Math.min(G.hpMax,G.hp+it.hp);msgs.push('+'+it.hp+' HP');}
-  if(it.stam>0){G.stam=Math.min(G.stamMax,G.stam+it.stam);msgs.push('+'+it.stam+' estamina');}
+  if(it.hp>0){G.hp=Math.min(getEffectiveStats().hpMax,G.hp+it.hp);msgs.push('+'+it.hp+' HP');}
+  if(it.stam>0){G.stam=Math.min(getEffectiveStats().stamMax,G.stam+it.stam);msgs.push('+'+it.stam+' estamina');}
   if(it.mana>0){G.mana=Math.min(G.manaMax,G.mana+it.mana);msgs.push('+'+it.mana+' mana');}
   addLog('💊 Usou: '+it.name,'info'); toast('💊 '+msgs.join(', '),'info');
   updateUI(); renderInventory();
@@ -4132,28 +4166,38 @@ async function startMission(missionId) {
   if (isKnockedOut()) { toast('💀 Você está na Enfermaria! Recupere-se antes.','bad'); return; }
   if (m.type === 'crime') {
     if (Date.now() < (G.jailUntil||0)) { toast('🔒 Você está preso! Pague a fiança ou aguarde.','bad'); return; }
-    // Call server to register crime and check if 11th (gets caught)
-    const crimeRes = await api('POST', '/api/crime/commit');
-    if (crimeRes.error) { toast(crimeRes.error,'bad'); return; }
-    if (crimeRes.caughtByCounter) {
-      // Automatically arrested — 10 min jail
-      G.stam -= m.stam;
-      G.jailUntil = Date.now() + 10 * 60 * 1000;
-      if (!G.log) G.log = [];
-      G.log.unshift({msg:'🚔 PRESO! Você foi o '+crimeRes.crimeNum+'º crime do servidor — a guarda estava esperando! 10min na cadeia.', cls:'bad'});
-      addLog('🚔 PRESO no crime #'+crimeRes.crimeNum+' do servidor! 10min na cadeia.','bad');
-      toast('🚔 PRESO! Você foi pego em flagrante!','bad');
+
+    // ── CRIMES: no combat — server resolves instantly ─────────────────────
+    G.stam -= m.stam;
+    const btn = document.querySelector('[onclick="startMission('+m.id+')"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Cometendo...'; }
+
+    const crimeRes = await api('POST', '/api/crime/commit', { missionId: m.id });
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Cometer Crime'; }
+
+    if (crimeRes.error) {
+      G.stam += m.stam; // refund stam on error
+      toast(crimeRes.error, 'bad');
+      return;
+    }
+
+    if (crimeRes.caught) {
+      // ARRESTED — 15 min, message: "O crime não compensa"
+      G.jailUntil = crimeRes.jailUntil || (Date.now() + 15 * 60 * 1000);
+      addLog('🚔 PRESO! Crime #' + crimeRes.crimeNum + '. 15min na cadeia.', 'bad');
       updateUI();
       updateJailBanner();
-      forceSave();
+      // Reload state from server (level up may have happened)
+      api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); updateJailBanner(); } });
       showModal(
         '🚔 Preso em Flagrante!',
         '<div style="text-align:center">'
-        + '<div style="font-size:36px;margin-bottom:8px">🚔</div>'
-        + '<div style="font-size:14px;color:var(--red-light);font-weight:700;margin-bottom:10px">A guarda estava esperando!</div>'
-        + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Você foi o <b>'+crimeRes.crimeNum+'º crime</b> cometido no servidor.<br>As autoridades estavam monitorando.</div>'
-        + '<div style="padding:10px;background:rgba(192,40,40,.1);border-radius:var(--radius);font-size:12px;color:var(--red-light)">'
-        + '🔒 Cadeia por 10 minutos<br><small>Pague 10.000 ouro de fiança ou R$2,99 via PIX para sair</small>'
+        + '<div style="font-size:48px;margin-bottom:8px">🚔</div>'
+        + '<div style="font-family:Cinzel,serif;font-size:18px;color:var(--red-light);font-weight:700;margin-bottom:10px">O crime não compensa!</div>'
+        + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">Você foi o <b>' + crimeRes.crimeNum + 'º crime</b> cometido no servidor.<br>A guarda estava monitorando as atividades.</div>'
+        + '<div style="padding:12px;background:rgba(192,40,40,.1);border-radius:var(--radius);font-size:12px;color:var(--red-light)">'
+        + '🔒 Cadeia por <b>15 minutos</b><br><small>Pague 10.000 ouro de fiança ou R$2,99 via PIX para sair antes</small>'
         + '</div></div>',
         [
           { label: '💰 Pagar 10.000 ouro', fn: async () => { closeModal(); await payBail(); }},
@@ -4163,7 +4207,21 @@ async function startMission(missionId) {
       );
       return;
     }
+
+    // SUCCESS — show reward
+    G.gold += crimeRes.gold || 0;
+    G.stats = G.stats || {};
+    G.stats.crimes   = (G.stats.crimes   || 0) + 1;
+    G.stats.missions = (G.stats.missions || 0) + 1;
+    addLog('🎭 Crime #' + crimeRes.crimeNum + ': +' + (crimeRes.gold||0).toLocaleString() + ' ouro +' + (crimeRes.xp||0).toLocaleString() + ' XP (bônus 5%)', 'good');
+    toast('🎭 Crime bem-sucedido! +' + (crimeRes.gold||0).toLocaleString() + ' ouro, +' + (crimeRes.xp||0).toLocaleString() + ' XP', 'good');
+    // Reload from server (XP + level up applied server-side)
+    api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
+    updateUI();
+    renderMissions('crime');
+    return;
   }
+
   G.stam -= m.stam;
   const enemy = m.enemies[Math.floor(Math.random() * m.enemies.length)];
   openCombat(m, enemy);
@@ -4542,6 +4600,12 @@ function gainXP(amount) {
   const isVip = G.vipUntil && G.vipUntil > Date.now();
   if (isVip) amount = Math.round(amount * 1.10);
   G.xp += amount;
+  // Always sync xpNext with current level to prevent stale values
+  if (!G.xpNext || G.xpNext !== xpForLevel(G.level)) {
+    G.xpNext = xpForLevel(G.level);
+  }
+  // Ensure xpNext is always correct before level up check
+  G.xpNext = xpForLevel(G.level);
   while (G.xp >= G.xpNext) {
     G.xp -= G.xpNext;
     G.level++;
@@ -4876,6 +4940,11 @@ function initGame() {
   setTimeout(loadPartyState, 1500);
   setTimeout(loadServerAssassin, 2000);
   if (!G.friends) G.friends = [];
+  // Sync xpNext and cap HP/Stam to effective max on game start
+  G.xpNext = xpForLevel(G.level);
+  const _startEff = getEffectiveStats();
+  if (G.hp   > _startEff.hpMax)   G.hp   = _startEff.hpMax;
+  if (G.stam > _startEff.stamMax) G.stam = _startEff.stamMax;
   updateUI();
   // Explicitly set name/class again after a tick to ensure DOM is ready
   setTimeout(() => {
@@ -7255,6 +7324,9 @@ function registerTavernSSEHandlers() {
     const hudStamLbl= document.getElementById('hud-stam-label');
     const _regenEff = getEffectiveStats();
     const pct = (v, mx) => Math.round(Math.max(0, Math.min(100, v/mx*100))) + '%';
+    // Allow HP to regenerate up to effective max (base + equip bonuses)
+    if (d.hpMax > G.hp) G.hp = Math.min(d.hp, _regenEff.hpMax);
+    else G.hp = d.hp;
     if (hpBar)    hpBar.style.width    = pct(G.hp,   _regenEff.hpMax);
     if (hpTxt)    hpTxt.textContent    = G.hp   + ' / ' + _regenEff.hpMax;
     if (stamBar)  stamBar.style.width  = pct(G.stam, _regenEff.stamMax);
@@ -7867,7 +7939,19 @@ function registerShopSSEHandlers() {
     toast('💎 Compra confirmada! ' + summary.join(', '), 'good');
     addLog('💎 Compra: ' + d.productName + ' — ' + summary.join(', '), 'good');
 
-    // Reload state
+    // Immediately clear local state for releases (don't wait for server reload)
+    if (d.rewards && d.rewards.jailRelease) {
+      G.jailUntil = 0;
+      updateJailBanner();
+      toast('🔓 Você está livre! Fiança paga.', 'good');
+    }
+    if (d.rewards && d.rewards.infirmaryRelease) {
+      G.knockedOutUntil = 0;
+      if (d.rewards.hpFull) G.hp = (G.effectiveHpMax || G.hpMax);
+      updateInfirmaryBanner();
+      toast('💊 Curado! Você saiu da enfermaria.', 'good');
+    }
+    // Full reload to sync everything
     api('GET', '/api/load').then(lr => {
       if (lr.gameState) {
         G = lr.gameState;

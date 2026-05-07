@@ -306,16 +306,19 @@ function runPassiveRegen() {
     // Skip if in infirmary — KO players don't regen
     if (g.knockedOutUntil && g.knockedOutUntil > Date.now()) return;
 
-    // ── Determine true caps ──────────────────────────────────────────────
-    // HP cap = g.hpMax (set on level up, includes base class gains)
-    // NEVER exceed what the character actually has as max
-    const trueHpMax = Math.max(1, g.hpMax || 90);
+    // ── Determine true caps including equip bonuses ─────────────────────
+    // effectiveHpMax is saved by client during gameplay (includes all equip HP bonuses)
+    // Fall back to g.hpMax if not present
+    const trueHpMax = Math.max(g.hpMax || 90, g.effectiveHpMax || 0);
 
-    // Stam cap = g.stamMax + necklace bonus (if equipped)
-    // g.stamMax is the BASE max (no item bonuses)
+    // Stam: base + necklace bonus (server can check this directly)
     const hasStamNeck = Object.values(g.equipment || {})
       .some(eId => eId && eId.replace('!lucky','').split('+')[0] === 'neck_endurance');
-    const trueStamMax = Math.max(1, (g.stamMax || 10)) + (hasStamNeck ? 10 : 0);
+    // Also trust effectiveStamMax saved by client
+    const trueStamMax = Math.max(
+      (g.stamMax || 10) + (hasStamNeck ? 10 : 0),
+      g.effectiveStamMax || 0
+    );
 
     let changed = false;
 
@@ -539,40 +542,46 @@ function RACES_SERVER() {
 }
 
 function applyServerLevelUps(g) {
-  // Returns number of levels gained
   if (!g) return 0;
   const races = RACES_SERVER();
   const raceBonus = races[g.race] || races.humano;
   let levelsGained = 0;
 
-  while (g.xp >= (g.xpNext || xpForLevelServer(g.level || 1))) {
+  // ALWAYS recalculate xpNext from current level to prevent stale values
+  // causing runaway level jumps
+  g.xpNext = xpForLevelServer(g.level || 1);
+
+  // Cap: only allow up to 5 levels per distribute call to prevent
+  // accumulated XP from jumping many levels at once
+  const MAX_LEVELS_PER_CALL = 5;
+
+  while (levelsGained < MAX_LEVELS_PER_CALL) {
     const curLevel = g.level || 1;
-    const needed   = g.xpNext || xpForLevelServer(curLevel);
-    if (g.xp < needed) break;
+    const needed   = xpForLevelServer(curLevel); // always recalculate
+    if ((g.xp || 0) < needed) break;
+    if (curLevel >= 999) break;
 
     g.level  = curLevel + 1;
     g.xp    -= needed;
     g.xpNext = xpForLevelServer(g.level);
     levelsGained++;
 
-    // Apply stat gains per level (same as client gainXP)
+    // Apply per-level stat gains
     g.str    = (g.str    || 10) + 2 + raceBonus.str;
     g.dex    = (g.dex    || 10) + 2 + raceBonus.dex;
     g.mag    = (g.mag    || 10) + 2 + raceBonus.mag;
     g.res    = (g.res    || 10) + 2 + raceBonus.res;
     g.hpMax  = (g.hpMax  || 90) + 5 + raceBonus.hp;
-    g.hp     = g.hpMax; // full heal on level up
+    g.hp     = g.hpMax; // full HP on level up (base only, equip bonus applied client-side)
     g.stamMax= Math.min(50, (g.stamMax || 10) + 1);
 
-    // VIP bonus: +5 to all stats per level
+    // VIP: +5 stats per level
     if (g.vipUntil && g.vipUntil > Date.now()) {
       g.str += 5; g.dex += 5; g.mag += 5; g.res += 5;
     }
 
     if (!g.log) g.log = [];
-    g.log.unshift({ msg: '🎉 LEVEL UP! Nível ' + g.level + '! Atributos melhorados!', cls: 'good' });
-
-    if (levelsGained > 50) break; // safety cap
+    g.log.unshift({ msg: '🎉 LEVEL UP! Nível ' + g.level + '!', cls: 'good' });
   }
 
   return levelsGained;
@@ -639,10 +648,13 @@ function applyShopRewards(g, rewards) {
   // Emergency releases
   if (rewards.jailRelease) {
     g.jailUntil = 0;
+    console.log('[SHOP] Jail released for', g.name);
   }
   if (rewards.infirmaryRelease) {
     g.knockedOutUntil = 0;
-    if (rewards.hpFull) g.hp = g.hpMax;
+    // Use effectiveHpMax if saved, otherwise fall back to base hpMax
+    if (rewards.hpFull) g.hp = Math.max(g.hpMax, g.effectiveHpMax || 0);
+    console.log('[SHOP] Infirmary released for', g.name, '— HP restored to', g.hp);
   }
   if (rewards.log) {
     if (!g.log) g.log = [];
@@ -2301,8 +2313,13 @@ async function handleRequest(req, res) {
   //      (no painel do Mercado Pago → Webhooks → Adicionar)
   // ═══════════════════════════════════════════════════════════════════════
 
-  const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || 'SEU_ACCESS_TOKEN_AQUI';
-  const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET || 'SEU_WEBHOOK_SECRET_AQUI';
+  // ── AbacatePay config ──────────────────────────────────────────────────────
+  // 1. Acesse app.abacatepay.com → API Keys → criar chave de produção
+  // 2. Adicione no Railway: ABACATEPAY_API_KEY = abacate_live_xxxxxx
+  // 3. Configure webhook no dashboard AbacatePay → Webhooks → Add
+  //    URL: https://seu-app.up.railway.app/api/shop/webhook
+  //    Evento: billing.paid
+  const ABACATE_API_KEY = process.env.ABACATEPAY_API_KEY || '';
   const BASE_URL = process.env.BASE_URL || 'https://seudominio.up.railway.app';
 
   // Catálogo de produtos
@@ -2443,7 +2460,7 @@ async function handleRequest(req, res) {
     return;
   }
 
-  // ── POST /api/shop/buy — criar cobrança PIX ────────────────────────────
+  // ── POST /api/shop/buy — criar cobrança PIX via AbacatePay ──────────────
   if (method === 'POST' && url === '/api/shop/buy') {
     const username = verifyToken(getToken(req));
     if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
@@ -2451,143 +2468,172 @@ async function handleRequest(req, res) {
     const product = SHOP_CATALOG[productId];
     if (!product) { send(res, 404, { error: 'Produto nao encontrado.' }); return; }
 
+    if (!ABACATE_API_KEY) {
+      send(res, 500, { error: 'Pagamento nao configurado. Fale com o admin.' }); return;
+    }
+
     const db = loadDB();
     const user = db.users[username];
     if (!user || !user.gameState) { send(res, 400, { error: 'Personagem nao encontrado.' }); return; }
 
-    // Criar cobrança no Mercado Pago via API PIX
+    // AbacatePay — POST /v1/pixQrCode/create
+    // amount em CENTAVOS, expiresIn em SEGUNDOS
     try {
-      const idempotencyKey = username + '_' + productId + '_' + Date.now();
-      const mpBody = {
-        transaction_amount: product.price,
-        description: 'Terras de Arathorn - ' + product.name,
-        payment_method_id: 'pix',
-        payer: {
-          email: (user.email || username + '@arathorn.game'),
-          first_name: user.gameState.name || username,
-          last_name: 'Arathorn',
-          identification: { type: 'CPF', number: '00000000000' }
-        },
-        external_reference: username + '|' + productId + '|' + Date.now(),
-        notification_url: BASE_URL + '/api/shop/webhook',
+      const externalId = username + '|' + productId + '|' + Date.now();
+      const abacateBody = {
+        amount:      Math.round(product.price * 100), // R$ → centavos
+        expiresIn:   1800,                             // 30 minutos
+        description: 'Terras de Arathorn — ' + product.name,
+        metadata: { externalId }
       };
 
-      const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+      const abRes = await fetch('https://api.abacatepay.com/v1/pixQrCode/create', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + MP_ACCESS_TOKEN,
-          'X-Idempotency-Key': idempotencyKey,
+          'Content-Type':  'application/json',
+          'Authorization': 'Bearer ' + ABACATE_API_KEY,
         },
-        body: JSON.stringify(mpBody)
+        body: JSON.stringify(abacateBody)
       });
 
-      const mpData = await mpRes.json();
+      const abData = await abRes.json();
 
-      if (!mpRes.ok || !mpData.point_of_interaction) {
-        console.error('[SHOP] Mercado Pago error:', JSON.stringify(mpData));
+      if (!abRes.ok || !abData.data || !abData.data.brCode) {
+        console.error('[SHOP] AbacatePay error:', JSON.stringify(abData));
         send(res, 500, { error: 'Erro ao gerar PIX. Tente novamente.' }); return;
       }
 
-      const pix = mpData.point_of_interaction.transaction_data;
+      const pix = abData.data;
 
       // Salvar pedido pendente
       if (!db.pendingOrders) db.pendingOrders = {};
-      db.pendingOrders[mpData.id] = {
-        mpPaymentId: mpData.id,
+      db.pendingOrders[pix.id] = {
+        paymentId:  pix.id,
+        externalId,
         username,
         productId,
-        price: product.price,
-        status: 'pending',
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 30 * 60 * 1000, // 30 min
+        price:      product.price,
+        status:     'pending',
+        createdAt:  Date.now(),
+        expiresAt:  Date.now() + 30 * 60 * 1000,
       };
       saveDB(db);
 
+      // brCodeBase64 já vem com o prefixo data:image/png;base64,
+      const qrBase64 = pix.brCodeBase64
+        ? pix.brCodeBase64.replace(/^data:image\/png;base64,/, '')
+        : null;
+
       send(res, 200, {
-        ok: true,
-        paymentId: mpData.id,
-        pixCopiaECola: pix.qr_code,
-        pixQrCodeBase64: pix.qr_code_base64,
-        price: product.price,
-        productName: product.name,
-        expiresIn: 1800, // 30 minutes in seconds
+        ok:              true,
+        paymentId:       pix.id,
+        pixCopiaECola:   pix.brCode,
+        pixQrCodeBase64: qrBase64,
+        price:           product.price,
+        productName:     product.name,
+        expiresIn:       1800,
       });
     } catch(e) {
-      console.error('[SHOP] Fetch error:', e.message);
-      send(res, 500, { error: 'Erro de conexao com Mercado Pago.' });
+      console.error('[SHOP] AbacatePay fetch error:', e.message);
+      send(res, 500, { error: 'Erro de conexao com AbacatePay.' });
     }
     return;
   }
 
-  // ── POST /api/shop/webhook — receber confirmacao de pagamento ──────────
+  // ── POST /api/shop/webhook — AbacatePay webhook ──────────────────────────
+  // AbacatePay envia: { event: 'billing.paid', data: { billing: { id, status, metadata } } }
   if (method === 'POST' && url.startsWith('/api/shop/webhook')) {
     const body = await readBody(req);
-    // Mercado Pago sends: { action: 'payment.updated', data: { id: '123' } }
-    if (body.action !== 'payment.updated' && body.type !== 'payment') {
+    console.log('[WEBHOOK] Recebido:', JSON.stringify(body).slice(0, 200));
+
+    // Só processar evento de pagamento confirmado
+    const event = body.event || '';
+    if (event !== 'billing.paid' && event !== 'pixQrCode.paid') {
       send(res, 200, { ok: true }); return;
     }
-    const paymentId = (body.data && body.data.id) ? String(body.data.id) : null;
-    if (!paymentId) { send(res, 200, { ok: true }); return; }
 
-    // Verificar status no Mercado Pago
+    // Extrair ID do pagamento
+    // AbacatePay pode enviar: data.billing.id ou data.pixQrCode.id
+    const billing = (body.data && (body.data.billing || body.data.pixQrCode)) || {};
+    const paymentId = billing.id || null;
+
+    if (!paymentId) {
+      console.warn('[WEBHOOK] Sem paymentId no payload');
+      send(res, 200, { ok: true }); return;
+    }
+
     try {
-      const mpRes = await fetch('https://api.mercadopago.com/v1/payments/' + paymentId, {
-        headers: { 'Authorization': 'Bearer ' + MP_ACCESS_TOKEN }
-      });
-      const mpData = await mpRes.json();
-
-      if (mpData.status !== 'approved') {
-        send(res, 200, { ok: true }); return;
-      }
-
-      // Encontrar pedido
       const db = loadDB();
       if (!db.pendingOrders) db.pendingOrders = {};
-      const order = db.pendingOrders[paymentId];
-      if (!order) { send(res, 200, { ok: true }); return; }
-      if (order.status === 'completed') { send(res, 200, { ok: true }); return; }
 
-      // Aplicar recompensas
+      // Encontrar pedido pelo paymentId
+      let order = db.pendingOrders[paymentId];
+
+      // Fallback: buscar por externalId nos metadados
+      if (!order && billing.metadata && billing.metadata.externalId) {
+        order = Object.values(db.pendingOrders).find(o => o.externalId === billing.metadata.externalId);
+      }
+
+      if (!order) {
+        console.warn('[WEBHOOK] Pedido nao encontrado para paymentId:', paymentId);
+        send(res, 200, { ok: true }); return;
+      }
+      if (order.status === 'completed') {
+        send(res, 200, { ok: true }); return; // idempotente
+      }
+
       const product = SHOP_CATALOG[order.productId];
-      const user = db.users[order.username];
+      const user    = db.users[order.username];
       if (!product || !user || !user.gameState) {
+        console.warn('[WEBHOOK] Produto ou usuário não encontrado');
         send(res, 200, { ok: true }); return;
       }
 
       applyShopRewards(user.gameState, product.rewards);
-
-      order.status = 'completed';
+      order.status      = 'completed';
       order.completedAt = Date.now();
 
-      // Log de compras
       if (!db.purchaseLog) db.purchaseLog = [];
       db.purchaseLog.push({
-        username: order.username,
+        username:  order.username,
         productId: order.productId,
-        price: order.price,
+        price:     order.price,
         paymentId,
         ts: Date.now()
       });
 
       saveDB(db);
 
-      // Notificar jogador em tempo real
       sendSSE(order.username, 'purchase_confirmed', {
         productName: product.name,
         rewards: {
-          gold: product.rewards.gold || 0,
-          vipDays: product.rewards.vipDays || 0,
-          items: product.rewards.items?.length || 0,
-          consumables: product.rewards.consumables?.length || 0,
+          gold:             product.rewards.gold || 0,
+          vipDays:          product.rewards.vipDays || 0,
+          items:            (product.rewards.items||[]).length,
+          consumables:      (product.rewards.consumables||[]).length,
+          jailRelease:      !!product.rewards.jailRelease,
+          infirmaryRelease: !!product.rewards.infirmaryRelease,
+          hpFull:           !!product.rewards.hpFull,
         }
       });
 
-      console.log('[SHOP] Compra confirmada:', order.username, product.name, 'R$'+order.price);
+      console.log('[SHOP] ✅ Compra confirmada via AbacatePay:', order.username, product.name, 'R$'+order.price);
     } catch(e) {
       console.error('[SHOP] Webhook error:', e.message);
     }
     send(res, 200, { ok: true });
+    return;
+  }
+
+  // ── GET /api/shop/check/:id — polling de status ──────────────────────────
+  if (method === 'GET' && url.startsWith('/api/shop/check/')) {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const paymentId = url.slice('/api/shop/check/'.length);
+    const db = loadDB();
+    const order = (db.pendingOrders||{})[paymentId];
+    if (!order || order.username !== username) { send(res, 404, { error: 'Pedido nao encontrado.' }); return; }
+    send(res, 200, { status: order.status, completedAt: order.completedAt });
     return;
   }
 
@@ -2949,6 +2995,98 @@ async function handleRequest(req, res) {
     console.log('[CLAN] Criado:', name, '['+tag+'] por', username);
     send(res, 200, { ok:true, clanName: name, clanTag: tag, clanRole:'leader', clanFounded: user.gameState.clanFounded });
     return;
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CRIME SYSTEM — No combat, instant reward, 5th global crime = arrested
+  // Every 5th crime server-wide: that player goes to jail 15 min
+  // ═══════════════════════════════════════════════════════════════════════
+  if (method === 'POST' && url === '/api/crime/commit') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const body = await readBody(req);
+    const missionId = safeNumber(body.missionId, 0, 999);
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user || !user.gameState) { send(res, 400, { error: 'Personagem nao encontrado.' }); return; }
+    const g = user.gameState;
+
+    // Check if already in jail
+    if (g.jailUntil && g.jailUntil > Date.now()) {
+      const rem = Math.ceil((g.jailUntil - Date.now()) / 60000);
+      send(res, 400, { error: 'Você está preso! ' + rem + ' min restantes.' }); return;
+    }
+    // Check if KO
+    if (g.knockedOutUntil && g.knockedOutUntil > Date.now()) {
+      send(res, 400, { error: 'Você está na enfermaria!' }); return;
+    }
+
+    // Global crime counter — every 5th crime = caught
+    if (!db.globalStats) db.globalStats = {};
+    if (!db.globalStats.totalCrimes) db.globalStats.totalCrimes = 0;
+    db.globalStats.totalCrimes++;
+    const crimeNum = db.globalStats.totalCrimes;
+    const caughtByCounter = (crimeNum % 5 === 0);
+
+    if (caughtByCounter) {
+      // ARRESTED — 15 minutes jail
+      g.jailUntil = Date.now() + 15 * 60 * 1000;
+      if (!g.log) g.log = [];
+      g.log.unshift({ msg: '🚔 PRESO! Crime #' + crimeNum + ' do servidor. 15min na cadeia. O crime não compensa!', cls: 'bad' });
+      saveDB(db);
+      send(res, 200, { ok: true, caught: true, crimeNum, jailUntil: g.jailUntil }); return;
+    }
+
+    // Crime SUCCEEDS — calculate reward with 5% bonus
+    // Find the mission definition from a predefined list of crime rewards
+    const CRIME_REWARDS = {
+      53: { gold: [8,20],    xp: [6,14]    },
+      54: { gold: [40,80],   xp: [30,55]   },
+      55: { gold: [120,220], xp: [90,160]  },
+      56: { gold: [400,750], xp: [300,540] },
+      57: { gold: [2000,3500], xp: [1600,2800] },
+      58: { gold: [15000,26000], xp: [12000,19500] },
+      59: { gold: [200000,340000], xp: [160000,272000] },
+      60: { gold: [2000000,3400000], xp: [1600000,2720000] },
+    };
+    const reward = CRIME_REWARDS[missionId] || { gold: [10,30], xp: [8,20] };
+    const baseGold = Math.round(reward.gold[0] + Math.random() * (reward.gold[1] - reward.gold[0]));
+    const baseXp   = Math.round(reward.xp[0]   + Math.random() * (reward.xp[1]   - reward.xp[0]));
+    // +5% crime bonus
+    const gold = Math.round(baseGold * 1.05);
+    const xp   = Math.round(baseXp   * 1.05);
+
+    g.gold = (g.gold || 0) + gold;
+    g.xp   = (g.xp   || 0) + xp;
+    g.stats = g.stats || {};
+    g.stats.crimes   = (g.stats.crimes   || 0) + 1;
+    g.stats.missions = (g.stats.missions || 0) + 1;
+    // Server-side level up
+    applyServerLevelUps(g);
+    if (!g.log) g.log = [];
+    g.log.unshift({ msg: '🎭 Crime bem-sucedido! +' + gold + ' ouro +' + xp + ' XP (bônus 5%)', cls: 'good' });
+    saveDB(db);
+    send(res, 200, { ok: true, caught: false, crimeNum, gold, xp, newLevel: g.level }); return;
+  }
+
+  // Pay bail (gold) — keep existing
+  if (method === 'POST' && url === '/api/crime/bail') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user || !user.gameState) { send(res, 400, { error: 'Personagem nao encontrado.' }); return; }
+    const g = user.gameState;
+    if (!g.jailUntil || g.jailUntil <= Date.now()) { send(res, 400, { error: 'Voce nao esta preso.' }); return; }
+    const BAIL_COST = 10000;
+    if ((g.gold || 0) < BAIL_COST) { send(res, 400, { error: 'Precisa de 10.000 ouro para pagar a fianca.' }); return; }
+    g.gold -= BAIL_COST;
+    g.jailUntil = 0;
+    if (!g.log) g.log = [];
+    g.log.unshift({ msg: '⚖️ Pagou 10.000 ouro de fiança e saiu da cadeia!', cls: 'info' });
+    saveDB(db);
+    send(res, 200, { ok: true, newBalance: g.gold }); return;
   }
 
   send(res, 404, { error: 'Endpoint nao encontrado.' });
