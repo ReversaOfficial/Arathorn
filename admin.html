@@ -3,186 +3,196 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>⚔ Arathorn — Painel Admin</title>
+<title>⚔ Arathorn — Admin</title>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --bg:#0a0806;--bg2:#120e0a;--bg3:#1a1408;--panel:#1e1810;
-    --gold:#c9a84c;--gold2:#a07828;--green:#2a7a3a;--red:#c02828;
-    --text:#d4b483;--text2:#998870;--text3:#665544;
-    --border:#2a2218;--border2:#3a3025;--radius:6px;
-  }
-  body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;font-size:14px;min-height:100vh}
-  h1,h2,h3{font-family:Georgia,serif;color:var(--gold)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;font-size:14px;background:#0a0806;color:#d4b483;min-height:100vh}
+:root{
+  --bg:#0a0806;--bg2:#120e0a;--bg3:#1a1408;--panel:#1e1810;
+  --gold:#c9a84c;--gold2:#a07828;--green:#2a7a3a;--red:#8b2222;
+  --text:#d4b483;--text2:#998870;--text3:#665544;
+  --border:#2a2218;--border2:#3a3025;--r:6px;
+}
 
-  /* ── LOGIN ── */
-  #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at center,#1a0f00 0%,#000 100%)}
-  .login-box{background:var(--panel);border:1px solid var(--gold2);border-radius:12px;padding:40px;width:340px;text-align:center}
-  .login-box h1{font-size:22px;margin-bottom:4px}
-  .login-box p{font-size:12px;color:var(--text2);margin-bottom:24px}
-  .inp{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:14px;margin-bottom:12px;outline:none}
-  .inp:focus{border-color:var(--gold2)}
-  .btn{padding:10px 20px;border:none;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
-  .btn-gold{background:linear-gradient(135deg,var(--gold2),#c9a84c);color:#000;width:100%}
-  .btn-sm{padding:6px 12px;font-size:12px}
-  .btn-green{background:var(--green);color:#fff}
-  .btn-red{background:var(--red);color:#fff}
-  .btn-blue{background:#1a4a7a;color:#fff}
-  .btn-purple{background:#4a1a7a;color:#fff}
-  .err{color:#ff6060;font-size:12px;margin-top:6px}
+/* ── LAYOUT ── */
+#login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse,#1a0f00,#000)}
+#panel-wrap{display:none;flex-direction:column;height:100vh;overflow:hidden}
 
-  /* ── PANEL ── */
-  #panel-screen{display:none}
-  .topbar{background:var(--bg2);border-bottom:1px solid var(--border2);padding:10px 20px;display:flex;align-items:center;gap:16px}
-  .topbar h1{font-size:16px;margin:0}
-  .stats-row{display:flex;gap:10px;padding:14px 20px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
-  .stat-card{background:var(--panel);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 16px;min-width:110px;text-align:center}
-  .stat-card .val{font-size:22px;font-weight:700;color:var(--gold)}
-  .stat-card .lbl{font-size:11px;color:var(--text2);margin-top:2px}
-  .main{display:grid;grid-template-columns:1fr 340px;gap:0;height:calc(100vh - 110px);overflow:hidden}
-  .users-panel{overflow-y:auto;padding:16px}
-  .side-panel{border-left:1px solid var(--border);background:var(--bg2);overflow-y:auto;padding:16px}
-  .search-row{display:flex;gap:8px;margin-bottom:12px}
-  .search-row .inp{margin:0;flex:1}
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  th{background:var(--bg3);color:var(--text2);padding:8px 6px;text-align:left;position:sticky;top:0;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border2)}
-  td{padding:7px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
-  tr:hover td{background:rgba(201,168,76,.04);cursor:pointer}
-  tr.selected td{background:rgba(201,168,76,.08)}
-  .badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:600}
-  .badge-vip{background:rgba(160,100,220,.2);color:#c090e0;border:1px solid rgba(160,100,220,.4)}
-  .badge-online{background:rgba(40,120,40,.2);color:#70cc70;border:1px solid rgba(40,120,40,.4)}
-  .badge-offline{background:rgba(80,80,80,.2);color:#888;border:1px solid #333}
-  .badge-ban{background:rgba(200,40,40,.2);color:#ff7070;border:1px solid rgba(200,40,40,.4)}
-  .section{margin-bottom:18px}
-  .section h3{font-size:13px;color:var(--gold);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
-  .row2{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-  .row2 label{font-size:12px;color:var(--text2);min-width:90px}
-  .row2 .inp{margin:0;flex:1}
-  .info-row{font-size:12px;color:var(--text2);padding:4px 0;display:flex;justify-content:space-between}
-  .info-row span{color:var(--text)}
-  .no-select{color:var(--text3);font-style:italic;text-align:center;padding:40px;font-size:13px}
-  #toast{position:fixed;bottom:20px;right:20px;background:#1a3a1a;border:1px solid #2a6a2a;color:#70cc70;padding:10px 18px;border-radius:var(--radius);font-size:13px;display:none;z-index:999}
-  .vip-expiry{font-size:10px;color:#c090e0}
-  @media(max-width:900px){.main{grid-template-columns:1fr}.side-panel{display:none}}
+/* ── FORMS ── */
+.box{background:#1e1810;border:1px solid #3a3025;border-radius:12px;padding:36px;width:320px;text-align:center}
+.box h1{font:700 20px Georgia,serif;color:var(--gold);margin-bottom:4px}
+.box p{font-size:12px;color:var(--text2);margin-bottom:22px}
+.inp{width:100%;background:#120e0a;border:1px solid #3a3025;border-radius:var(--r);padding:10px 12px;color:var(--text);font-size:14px;margin-bottom:10px;outline:none}
+.inp:focus{border-color:var(--gold2)}
+.err{color:#ff6060;font-size:12px;min-height:18px;margin-bottom:8px}
+.btn{padding:10px 18px;border:none;border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+.btn-gold{background:linear-gradient(135deg,#a07828,#c9a84c);color:#000}
+.btn-gold:hover{filter:brightness(1.1)}
+.btn-full{width:100%}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-green{background:#1e4a1e;color:#7cc47c;border:1px solid #2a6a2a}
+.btn-red{background:#4a1e1e;color:#cc7c7c;border:1px solid #6a2a2a}
+.btn-blue{background:#1e2a4a;color:#7ca0cc;border:1px solid #2a3a6a}
+.btn-purple{background:#2a1e4a;color:#a07ccc;border:1px solid #3a2a6a}
+.btn-muted{background:#1a1408;color:var(--text2);border:1px solid #2a2218}
+
+/* ── TOPBAR ── */
+.topbar{background:#120e0a;border-bottom:1px solid #2a2218;padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar h1{font:700 15px Georgia,serif;color:var(--gold)}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{background:#1e1810;border:1px solid #2a2218;border-radius:var(--r);padding:5px 12px;text-align:center}
+.stat .v{font-size:18px;font-weight:700;color:var(--gold)}
+.stat .l{font-size:10px;color:var(--text2)}
+
+/* ── MAIN ── */
+.main{display:grid;grid-template-columns:1fr 320px;flex:1;overflow:hidden}
+@media(max-width:800px){.main{grid-template-columns:1fr}}
+
+/* ── TABLE ── */
+.table-wrap{overflow-y:auto;padding:12px}
+.search-bar{display:flex;gap:8px;margin-bottom:10px}
+.search-bar .inp{margin:0;flex:1}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#120e0a;color:var(--text2);padding:7px 6px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #2a2218;position:sticky;top:0}
+td{padding:6px;border-bottom:1px solid #1a1408;vertical-align:middle}
+tr{cursor:pointer}
+tr:hover td{background:rgba(201,168,76,.04)}
+tr.sel td{background:rgba(201,168,76,.09)}
+.badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px}
+.b-on{background:rgba(40,120,40,.2);color:#70cc70;border:1px solid #2a6a2a}
+.b-off{background:rgba(60,60,60,.2);color:#888;border:1px solid #333}
+.b-vip{background:rgba(160,100,220,.2);color:#c090e0;border:1px solid rgba(160,100,220,.4)}
+.b-ban{background:rgba(200,40,40,.2);color:#ff7070;border:1px solid rgba(200,40,40,.4)}
+
+/* ── SIDE PANEL ── */
+.side{border-left:1px solid #2a2218;overflow-y:auto;padding:14px;background:#120e0a}
+@media(max-width:800px){.side{display:none}}
+.sec{margin-bottom:16px}
+.sec h3{font:600 12px Georgia,serif;color:var(--gold);border-bottom:1px solid #2a2218;padding-bottom:6px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.row label{font-size:11px;color:var(--text2);min-width:80px;flex-shrink:0}
+.row .inp{margin:0;flex:1;padding:7px 10px;font-size:12px}
+.info-r{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}
+.info-r span{color:var(--text)}
+.no-sel{color:var(--text3);font-style:italic;text-align:center;padding:40px 0;font-size:12px}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:16px;right:16px;padding:10px 16px;border-radius:var(--r);font-size:13px;display:none;z-index:999;max-width:320px}
 </style>
 </head>
 <body>
 
 <!-- LOGIN -->
-<div id="login-screen">
-  <div class="login-box">
+<div id="login-wrap">
+  <div class="box">
     <h1>⚔ ARATHORN</h1>
     <p>Painel de Administração</p>
-    <input class="inp" id="a-user" type="text" placeholder="Usuário admin" autocomplete="off" onkeydown="if(event.key==='Enter')adminLogin()">
-    <input class="inp" id="a-pass" type="password" placeholder="Senha" onkeydown="if(event.key==='Enter')adminLogin()">
-    <div class="err" id="a-err"></div>
-    <button class="btn btn-gold" onclick="adminLogin()" style="margin-top:12px">Entrar</button>
+    <input class="inp" id="u" type="text" placeholder="Usuário" autocomplete="off"
+      onkeydown="if(event.key==='Enter')document.getElementById('p').focus()">
+    <input class="inp" id="p" type="password" placeholder="Senha"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="err" id="err"></div>
+    <button class="btn btn-gold btn-full" id="login-btn" onclick="doLogin()">Entrar</button>
   </div>
 </div>
 
 <!-- PANEL -->
-<div id="panel-screen">
+<div id="panel-wrap">
+  <!-- Topbar -->
   <div class="topbar">
     <h1>⚔ ARATHORN — Admin</h1>
-    <div class="stats-row" style="padding:0;border:none;gap:8px;flex:1" id="stats-row"></div>
-    <div style="display:flex;gap:6px;margin-left:auto;align-items:center">
-      <button class="btn btn-sm btn-blue" onclick="exportDB()" title="Baixar backup do banco antes do deploy">⬇ Exportar DB</button>
-      <label class="btn btn-sm" style="background:#2a4a1a;color:#8dcc6d;cursor:pointer;margin:0" title="Restaurar banco após deploy">
-        ⬆ Importar DB
-        <input type="file" accept=".json" onchange="importDB(this)" style="display:none">
+    <div class="stats" id="stats-bar"></div>
+    <div style="margin-left:auto;display:flex;gap:6px">
+      <button class="btn btn-sm btn-blue" onclick="exportDB()">⬇ DB</button>
+      <label class="btn btn-sm btn-green" style="cursor:pointer">
+        ⬆ DB<input type="file" accept=".json" onchange="importDB(this)" style="display:none">
       </label>
-      <button class="btn btn-sm" style="background:var(--bg3);color:var(--text2)" onclick="adminLogout()">Sair</button>
+      <button class="btn btn-sm btn-muted" onclick="doLogout()">Sair</button>
     </div>
   </div>
 
+  <!-- Main -->
   <div class="main">
-    <!-- Users list -->
-    <div class="users-panel">
-      <div class="search-row">
-        <input class="inp" id="search-inp" placeholder="🔍 Buscar usuário ou personagem..." oninput="filterUsers()">
-        <button class="btn btn-sm btn-green" onclick="loadUsers()">↻ Atualizar</button>
+    <!-- User list -->
+    <div class="table-wrap">
+      <div class="search-bar">
+        <input class="inp" id="srch" placeholder="🔍 Buscar..." oninput="filter()">
+        <button class="btn btn-sm btn-muted" onclick="load()">↻</button>
       </div>
       <table>
         <thead>
           <tr>
-            <th>Status</th>
-            <th>Usuário</th>
-            <th>Personagem</th>
-            <th>Raça</th>
-            <th>Lv</th>
-            <th>Ouro</th>
-            <th>VIP</th>
-            <th>PvP</th>
+            <th>Status</th><th>Usuário</th><th>Personagem</th>
+            <th>Raça</th><th>Lv</th><th>Ouro</th><th>VIP</th><th>PvP</th>
           </tr>
         </thead>
-        <tbody id="users-tbody"></tbody>
+        <tbody id="tbody"></tbody>
       </table>
     </div>
 
-    <!-- Edit panel -->
-    <div class="side-panel" id="side-panel">
-      <div class="no-select" id="no-select-msg">Clique em um usuário para editar</div>
-      <div id="edit-form" style="display:none">
+    <!-- Edit side panel -->
+    <div class="side">
+      <div class="no-sel" id="hint">← Clique em um usuário</div>
+      <div id="edit" style="display:none">
 
-        <div class="section">
-          <h3 id="edit-name">—</h3>
-          <div class="info-row">Usuário: <span id="inf-user">—</span></div>
-          <div class="info-row">Criado: <span id="inf-created">—</span></div>
-          <div class="info-row">Último login: <span id="inf-login">—</span></div>
-          <div class="info-row">Missões: <span id="inf-missions">—</span></div>
-          <div class="info-row">PvP Wins: <span id="inf-pvp">—</span></div>
+        <div class="sec">
+          <h3 id="edit-title">—</h3>
+          <div class="info-r">Usuário: <span id="i-user">—</span></div>
+          <div class="info-r">Criado: <span id="i-created">—</span></div>
+          <div class="info-r">Último login: <span id="i-login">—</span></div>
+          <div class="info-r">Missões: <span id="i-missions">—</span></div>
+          <div class="info-r">PvP Wins: <span id="i-pvp">—</span></div>
+          <div class="info-r">VIP expira: <span id="i-vip">—</span></div>
         </div>
 
-        <div class="section">
+        <div class="sec">
           <h3>👑 VIP</h3>
-          <div class="info-row">Expira: <span id="inf-vip">—</span></div>
-          <div class="row2">
-            <label>+ Dias VIP</label>
-            <input class="inp" id="e-vip-days" type="number" min="1" max="3650" placeholder="30" style="width:80px">
-            <button class="btn btn-sm btn-purple" onclick="addVip()">Adicionar</button>
+          <div class="row">
+            <label>+ Dias</label>
+            <input class="inp" id="e-vip" type="number" min="1" max="3650" placeholder="30" style="width:70px">
+            <button class="btn btn-sm btn-purple" onclick="addVip()">Dar</button>
           </div>
         </div>
 
-        <div class="section">
+        <div class="sec">
           <h3>⚔ Atributos</h3>
-          <div class="row2"><label>Nível</label><input class="inp" id="e-level" type="number" min="1" max="999"></div>
-          <div class="row2"><label>XP</label><input class="inp" id="e-xp" type="number" min="0"></div>
-          <div class="row2"><label>HP</label><input class="inp" id="e-hp" type="number" min="0"></div>
-          <div class="row2"><label>HP Máx</label><input class="inp" id="e-hpmax" type="number" min="1"></div>
-          <div class="row2"><label>STR</label><input class="inp" id="e-str" type="number" min="1"></div>
-          <div class="row2"><label>DEX</label><input class="inp" id="e-dex" type="number" min="1"></div>
-          <div class="row2"><label>MAG</label><input class="inp" id="e-mag" type="number" min="1"></div>
-          <div class="row2"><label>RES</label><input class="inp" id="e-res" type="number" min="1"></div>
-          <div class="row2"><label>Estamina</label><input class="inp" id="e-stam" type="number" min="0"></div>
-          <div class="row2"><label>Stam Máx</label><input class="inp" id="e-stammax" type="number" min="1"></div>
-          <button class="btn btn-green" style="width:100%;margin-top:4px" onclick="saveAttr()">💾 Salvar Atributos</button>
+          <div class="row"><label>Nível</label><input class="inp" id="e-level" type="number" min="1" max="999"></div>
+          <div class="row"><label>XP</label><input class="inp" id="e-xp" type="number" min="0"></div>
+          <div class="row"><label>HP</label><input class="inp" id="e-hp" type="number" min="0"></div>
+          <div class="row"><label>HP Máx</label><input class="inp" id="e-hpmax" type="number" min="1"></div>
+          <div class="row"><label>STR</label><input class="inp" id="e-str" type="number" min="1"></div>
+          <div class="row"><label>DEX</label><input class="inp" id="e-dex" type="number" min="1"></div>
+          <div class="row"><label>MAG</label><input class="inp" id="e-mag" type="number" min="1"></div>
+          <div class="row"><label>RES</label><input class="inp" id="e-res" type="number" min="1"></div>
+          <div class="row"><label>Estamina</label><input class="inp" id="e-stam" type="number" min="0"></div>
+          <div class="row"><label>Stam Máx</label><input class="inp" id="e-stammax" type="number" min="1"></div>
+          <button class="btn btn-green" style="width:100%;margin-top:4px" onclick="saveAttr()">💾 Salvar</button>
         </div>
 
-        <div class="section">
+        <div class="sec">
           <h3>⬡ Ouro</h3>
-          <div class="info-row">Atual: <span id="inf-gold">—</span></div>
-          <div class="row2">
+          <div class="info-r">Atual: <span id="i-gold">—</span></div>
+          <div class="row">
             <label>Quantidade</label>
-            <input class="inp" id="e-gold" type="number" placeholder="ex: 50000">
-            <button class="btn btn-sm btn-gold" onclick="addGold()">+ Dar</button>
+            <input class="inp" id="e-gold" type="number" placeholder="50000">
+            <button class="btn btn-sm btn-gold" onclick="addGold()">Dar</button>
           </div>
         </div>
 
-        <div class="section">
-          <h3>🔑 Senha</h3>
-          <div class="row2">
+        <div class="sec">
+          <h3>🔑 Redefinir Senha</h3>
+          <div class="row">
             <label>Nova senha</label>
-            <input class="inp" id="e-pass" type="text" placeholder="mín. 6 chars">
+            <input class="inp" id="e-pass" type="text" placeholder="mín. 6">
           </div>
-          <button class="btn btn-sm btn-blue" style="width:100%" onclick="resetPass()">🔑 Redefinir Senha</button>
+          <button class="btn btn-blue" style="width:100%" onclick="resetPass()">Alterar Senha</button>
         </div>
 
-        <div class="section">
+        <div class="sec">
           <h3>⚠️ Conta</h3>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-sm btn-red" id="btn-ban" onclick="toggleBan()" style="flex:1">🚫 Banir</button>
-            <button class="btn btn-sm" style="flex:1;background:var(--bg3);color:var(--text2)" onclick="clearSelected()">✕ Fechar</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-red" id="ban-btn" onclick="toggleBan()" style="flex:1">🚫 Banir</button>
+            <button class="btn btn-sm btn-muted" onclick="clearSel()" style="flex:1">✕ Fechar</button>
           </div>
         </div>
 
@@ -194,229 +204,265 @@
 <div id="toast"></div>
 
 <script>
-let ADMIN_TOKEN = '';
-let allUsers    = [];
-let selected    = null;
+'use strict';
 
-// ── AUTH ─────────────────────────────────────────────────────────────────────
-async function adminLogin() {
-  const u = document.getElementById('a-user').value.trim();
-  const p = document.getElementById('a-pass').value;
-  const err = document.getElementById('a-err');
+let TOKEN = '';
+let ALL   = [];
+let SEL   = null;
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const u   = document.getElementById('u').value.trim();
+  const p   = document.getElementById('p').value;
+  const err = document.getElementById('err');
+  const btn = document.getElementById('login-btn');
   err.textContent = '';
-  const res = await fetch('/api/admin/login', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ username:u, password:p })
-  }).then(r=>r.json()).catch(()=>({error:'Erro de conexão'}));
-  if (res.error) { err.textContent = res.error; return; }
-  ADMIN_TOKEN = res.token;
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('panel-screen').style.display = '';
-  await loadStats();
-  await loadUsers();
-  setInterval(loadStats, 30000);
+  if (!u || !p) { err.textContent = 'Preencha todos os campos.'; return; }
+  btn.disabled = true; btn.textContent = 'Entrando...';
+  try {
+    const r = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) {
+      err.textContent = d.error || 'Erro desconhecido';
+      btn.disabled = false; btn.textContent = 'Entrar';
+      return;
+    }
+    TOKEN = d.token;
+    // Switch screens
+    document.getElementById('login-wrap').style.display  = 'none';
+    document.getElementById('panel-wrap').style.display  = 'flex';
+    await loadStats();
+    await load();
+    setInterval(loadStats, 30000);
+  } catch(e) {
+    err.textContent = 'Erro de conexão: ' + e.message;
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
 }
 
-function adminLogout() {
-  ADMIN_TOKEN = '';
-  document.getElementById('panel-screen').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
+function doLogout() {
+  TOKEN = '';
+  document.getElementById('panel-wrap').style.display  = 'none';
+  document.getElementById('login-wrap').style.display  = 'flex';
+  document.getElementById('u').value = '';
+  document.getElementById('p').value = '';
+  document.getElementById('err').textContent = '';
+  document.getElementById('login-btn').disabled = false;
+  document.getElementById('login-btn').textContent = 'Entrar';
 }
 
-async function apiFetch(url, method, body) {
-  const opts = { method: method||'GET', headers: { 'Authorization':'Bearer '+ADMIN_TOKEN, 'Content-Type':'application/json' } };
+async function req(method, url, body) {
+  const opts = {
+    method,
+    headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' }
+  };
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(url, opts);
-  return res.json().catch(()=>({error:'Erro de rede'}));
+  const r = await fetch(url, opts);
+  const d = await r.json().catch(() => ({ error: 'Resposta inválida' }));
+  if (r.status === 401) { doLogout(); return null; }
+  return d;
 }
 
 // ── STATS ─────────────────────────────────────────────────────────────────────
 async function loadStats() {
-  const s = await apiFetch('/api/admin/stats');
-  if (s.error) return;
-  document.getElementById('stats-row').innerHTML = [
-    ['Usuários',s.totalUsers],['Com Personagem',s.withCharacter],
-    ['Online Agora',s.onlineNow],['VIP Ativos',s.vipActive],
-    ['Total Crimes',s.totalCrimes]
-  ].map(([l,v])=>'<div class="stat-card"><div class="val">'+v+'</div><div class="lbl">'+l+'</div></div>').join('');
+  const d = await req('GET', '/api/admin/stats');
+  if (!d) return;
+  document.getElementById('stats-bar').innerHTML = [
+    ['Usuários', d.totalUsers],
+    ['Com Char', d.withCharacter],
+    ['Online', d.onlineNow],
+    ['VIP', d.vipActive],
+    ['Crimes', d.totalCrimes]
+  ].map(([l,v]) =>
+    `<div class="stat"><div class="v">${v??'?'}</div><div class="l">${l}</div></div>`
+  ).join('');
 }
 
 // ── USERS ─────────────────────────────────────────────────────────────────────
-async function loadUsers() {
-  const res = await apiFetch('/api/admin/users');
-  if (res.error) { showToast('Erro: '+res.error,'red'); return; }
-  allUsers = res.users || [];
-  renderUsers(allUsers);
+async function load() {
+  const d = await req('GET', '/api/admin/users');
+  if (!d || !d.users) return;
+  ALL = d.users;
+  render(ALL);
 }
 
-function filterUsers() {
-  const q = document.getElementById('search-inp').value.toLowerCase();
-  renderUsers(q ? allUsers.filter(u =>
-    u.username.includes(q) || (u.name||'').toLowerCase().includes(q)
-  ) : allUsers);
+function filter() {
+  const q = document.getElementById('srch').value.toLowerCase();
+  render(q ? ALL.filter(u =>
+    u.username.includes(q) || (u.name || '').toLowerCase().includes(q)
+  ) : ALL);
 }
 
-const RACE_ICON = {elfo:'🧝',orc:'👹',anao:'⛏️',humano:'🧑‍⚔️',druida:'🌿',mago:'🧙'};
-function renderUsers(users) {
-  const tbody = document.getElementById('users-tbody');
-  tbody.innerHTML = users.map(u => {
-    const vipActive = u.vipUntil > Date.now();
-    const vipDays   = vipActive ? Math.ceil((u.vipUntil-Date.now())/86400000)+'d' : '—';
-    const goldStr   = u.gold>=1e6?(u.gold/1e6).toFixed(1)+'M':u.gold>=1e3?(u.gold/1e3).toFixed(0)+'K':u.gold;
-    return '<tr onclick="selectUser(\''+u.username+'\')" class="'+(selected&&selected.username===u.username?'selected':'')+'">'+
-      '<td>'+(u.online?'<span class="badge badge-online">● Online</span>':'<span class="badge badge-offline">○ Off</span>')+
-             (u.banned?'<span class="badge badge-ban" style="margin-left:4px">BAN</span>':'')+'</td>'+
-      '<td style="color:#aaa;font-size:11px">@'+u.username+'</td>'+
-      '<td><b>'+u.name+'</b></td>'+
-      '<td>'+(RACE_ICON[u.race]||'👤')+' '+u.race+'</td>'+
-      '<td><b style="color:var(--gold)">'+u.level+'</b></td>'+
-      '<td>'+goldStr+'</td>'+
-      '<td>'+(vipActive?'<span class="badge badge-vip">👑 '+vipDays+'</span>':'—')+'</td>'+
-      '<td>'+u.pvpWins+'</td>'+
-      '</tr>';
+const RICON = {elfo:'🧝',orc:'👹',anao:'⛏️',humano:'🧑‍⚔️',druida:'🌿',mago:'🧙'};
+function fmtG(g) { return g>=1e6?(g/1e6).toFixed(1)+'M':g>=1e3?Math.round(g/1e3)+'K':g; }
+function fmtD(ts) { return ts ? new Date(ts).toLocaleDateString('pt-BR') : '—'; }
+
+function render(list) {
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = list.map(u => {
+    const vip = u.vipUntil > Date.now();
+    const days = vip ? Math.ceil((u.vipUntil - Date.now()) / 86400000) + 'd' : '—';
+    const sel  = SEL && SEL.username === u.username;
+    return `<tr onclick="select('${u.username}')" class="${sel ? 'sel' : ''}">
+      <td>
+        ${u.online ? '<span class="badge b-on">● On</span>' : '<span class="badge b-off">○ Off</span>'}
+        ${u.banned ? ' <span class="badge b-ban">BAN</span>' : ''}
+      </td>
+      <td style="color:#aaa;font-size:11px">@${u.username}</td>
+      <td><b>${u.name || '—'}</b></td>
+      <td>${RICON[u.race] || '👤'}</td>
+      <td style="color:var(--gold);font-weight:700">${u.level || 0}</td>
+      <td>${fmtG(u.gold || 0)}</td>
+      <td>${vip ? `<span class="badge b-vip">👑 ${days}</span>` : '—'}</td>
+      <td>${u.pvpWins || 0}</td>
+    </tr>`;
   }).join('');
 }
 
-function selectUser(username) {
-  selected = allUsers.find(u => u.username === username);
-  if (!selected) return;
-  renderUsers(allUsers.filter(u => {
-    const q = document.getElementById('search-inp').value.toLowerCase();
+function select(username) {
+  SEL = ALL.find(u => u.username === username);
+  if (!SEL) return;
+  render(ALL.filter(u => {
+    const q = document.getElementById('srch').value.toLowerCase();
     return !q || u.username.includes(q) || (u.name||'').toLowerCase().includes(q);
   }));
-  document.getElementById('no-select-msg').style.display='none';
-  document.getElementById('edit-form').style.display='';
-  // Fill info
-  document.getElementById('edit-name').textContent = selected.name + ' (@'+selected.username+')';
-  document.getElementById('inf-user').textContent    = selected.username;
-  document.getElementById('inf-created').textContent = selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('pt-BR') : '—';
-  document.getElementById('inf-login').textContent   = selected.lastLogin  ? new Date(selected.lastLogin).toLocaleDateString('pt-BR') : '—';
-  document.getElementById('inf-missions').textContent = selected.missions;
-  document.getElementById('inf-pvp').textContent      = selected.pvpWins;
-  // VIP
-  const vipActive = selected.vipUntil > Date.now();
-  document.getElementById('inf-vip').textContent = vipActive
-    ? new Date(selected.vipUntil).toLocaleString('pt-BR') + ' (ativo)'
+  // Fill side panel
+  document.getElementById('hint').style.display = 'none';
+  document.getElementById('edit').style.display = '';
+  document.getElementById('edit-title').textContent = (SEL.name || '—') + ' (@' + SEL.username + ')';
+  document.getElementById('i-user').textContent      = SEL.username;
+  document.getElementById('i-created').textContent   = fmtD(SEL.createdAt);
+  document.getElementById('i-login').textContent     = fmtD(SEL.lastLogin);
+  document.getElementById('i-missions').textContent  = SEL.missions || 0;
+  document.getElementById('i-pvp').textContent       = SEL.pvpWins  || 0;
+  document.getElementById('i-gold').textContent      = (SEL.gold || 0).toLocaleString();
+  const vip = SEL.vipUntil > Date.now();
+  document.getElementById('i-vip').textContent = vip
+    ? new Date(SEL.vipUntil).toLocaleString('pt-BR') + ' (ativo)'
     : 'Sem VIP';
-  // Gold
-  document.getElementById('inf-gold').textContent = (selected.gold||0).toLocaleString();
-  // Attributes
-  ['level','xp','hp','hpMax','str','dex','mag','res','stam','stamMax'].forEach(f => {
-    const el = document.getElementById('e-'+f.toLowerCase().replace('max','max'));
-    if (el) el.value = selected[f]||0;
+  // Attr inputs
+  const fields = { level: SEL.level, xp: SEL.xp, hp: SEL.hp, hpmax: SEL.hpMax,
+                   str: SEL.str, dex: SEL.dex, mag: SEL.mag, res: SEL.res,
+                   stam: SEL.stam, stammax: SEL.stamMax };
+  Object.entries(fields).forEach(([k,v]) => {
+    const el = document.getElementById('e-' + k);
+    if (el) el.value = v || 0;
   });
-  document.getElementById('e-hpmax').value  = selected.hpMax  || 0;
-  document.getElementById('e-stammax').value= selected.stamMax|| 0;
   // Ban button
-  document.getElementById('btn-ban').textContent = selected.banned ? '✓ Remover Ban' : '🚫 Banir';
-  document.getElementById('btn-ban').className = 'btn btn-sm ' + (selected.banned ? 'btn-blue' : 'btn-red');
+  const bb = document.getElementById('ban-btn');
+  bb.textContent = SEL.banned ? '✓ Remover Ban' : '🚫 Banir';
+  bb.className   = 'btn btn-sm ' + (SEL.banned ? 'btn-blue' : 'btn-red');
 }
 
-function clearSelected() {
-  selected = null;
-  document.getElementById('no-select-msg').style.display='';
-  document.getElementById('edit-form').style.display='none';
+function clearSel() {
+  SEL = null;
+  document.getElementById('hint').style.display = '';
+  document.getElementById('edit').style.display = 'none';
+  render(ALL.filter(u => {
+    const q = document.getElementById('srch').value.toLowerCase();
+    return !q || u.username.includes(q) || (u.name||'').toLowerCase().includes(q);
+  }));
 }
 
 // ── ACTIONS ───────────────────────────────────────────────────────────────────
 async function addVip() {
-  if (!selected) return;
-  const days = parseInt(document.getElementById('e-vip-days').value)||0;
-  if (days < 1) { showToast('Informe os dias de VIP','red'); return; }
-  const res = await apiFetch('/api/admin/vip','POST',{targetUsername:selected.username, days});
-  if (res.error) { showToast(res.error,'red'); return; }
-  showToast('✓ '+days+' dias de VIP adicionados para '+selected.username);
-  await loadUsers(); selectUser(selected.username);
+  if (!SEL) return;
+  const days = parseInt(document.getElementById('e-vip').value) || 0;
+  if (days < 1) { toast('Informe os dias.', 'red'); return; }
+  const d = await req('POST', '/api/admin/vip', { targetUsername: SEL.username, days });
+  if (!d) return;
+  if (d.error) { toast(d.error, 'red'); return; }
+  toast('✓ ' + days + ' dias de VIP para @' + SEL.username);
+  document.getElementById('e-vip').value = '';
+  await load(); select(SEL.username);
 }
 
 async function saveAttr() {
-  if (!selected) return;
-  const changes = {
-    level:   parseInt(document.getElementById('e-level').value)||1,
-    xp:      parseInt(document.getElementById('e-xp').value)||0,
-    hp:      parseInt(document.getElementById('e-hp').value)||0,
-    hpMax:   parseInt(document.getElementById('e-hpmax').value)||1,
-    str:     parseInt(document.getElementById('e-str').value)||1,
-    dex:     parseInt(document.getElementById('e-dex').value)||1,
-    mag:     parseInt(document.getElementById('e-mag').value)||1,
-    res:     parseInt(document.getElementById('e-res').value)||1,
-    stam:    parseInt(document.getElementById('e-stam').value)||0,
-    stamMax: parseInt(document.getElementById('e-stammax').value)||1,
-  };
-  const res = await apiFetch('/api/admin/edit','POST',{targetUsername:selected.username, changes});
-  if (res.error) { showToast(res.error,'red'); return; }
-  showToast('✓ Atributos salvos para '+selected.username);
-  await loadUsers(); selectUser(selected.username);
+  if (!SEL) return;
+  const fields = ['level','xp','hp','hpMax','str','dex','mag','res','stam','stamMax'];
+  const changes = {};
+  fields.forEach(f => {
+    const el = document.getElementById('e-' + f.toLowerCase().replace('max','max'));
+    if (el) changes[f] = parseInt(el.value) || 0;
+  });
+  const d = await req('POST', '/api/admin/edit', { targetUsername: SEL.username, changes });
+  if (!d) return;
+  if (d.error) { toast(d.error, 'red'); return; }
+  toast('✓ Atributos salvos para @' + SEL.username);
+  await load(); select(SEL.username);
 }
 
 async function addGold() {
-  if (!selected) return;
-  const amount = parseInt(document.getElementById('e-gold').value)||0;
-  if (!amount) { showToast('Informe a quantidade de ouro','red'); return; }
-  const res = await apiFetch('/api/admin/gold','POST',{targetUsername:selected.username, amount});
-  if (res.error) { showToast(res.error,'red'); return; }
-  showToast('✓ '+amount.toLocaleString()+' ouro adicionado');
-  document.getElementById('e-gold').value='';
-  await loadUsers(); selectUser(selected.username);
+  if (!SEL) return;
+  const amount = parseInt(document.getElementById('e-gold').value) || 0;
+  if (!amount) { toast('Informe a quantidade.', 'red'); return; }
+  const d = await req('POST', '/api/admin/gold', { targetUsername: SEL.username, amount });
+  if (!d) return;
+  if (d.error) { toast(d.error, 'red'); return; }
+  toast('✓ ' + amount.toLocaleString() + ' ouro para @' + SEL.username);
+  document.getElementById('e-gold').value = '';
+  await load(); select(SEL.username);
 }
 
 async function resetPass() {
-  if (!selected) return;
+  if (!SEL) return;
   const np = document.getElementById('e-pass').value;
-  if (!np || np.length < 6) { showToast('Senha mínimo 6 caracteres','red'); return; }
-  if (!confirm('Redefinir senha de @'+selected.username+'?')) return;
-  const res = await apiFetch('/api/admin/resetpass','POST',{targetUsername:selected.username, newPassword:np});
-  if (res.error) { showToast(res.error,'red'); return; }
-  showToast('✓ Senha redefinida para '+selected.username);
-  document.getElementById('e-pass').value='';
+  if (!np || np.length < 6) { toast('Mínimo 6 caracteres.', 'red'); return; }
+  if (!confirm('Redefinir senha de @' + SEL.username + '?')) return;
+  const d = await req('POST', '/api/admin/resetpass', { targetUsername: SEL.username, newPassword: np });
+  if (!d) return;
+  if (d.error) { toast(d.error, 'red'); return; }
+  toast('✓ Senha redefinida para @' + SEL.username);
+  document.getElementById('e-pass').value = '';
 }
 
 async function toggleBan() {
-  if (!selected) return;
-  const newBanned = !selected.banned;
-  if (!confirm((newBanned?'Banir':'Remover ban de')+' @'+selected.username+'?')) return;
-  const res = await apiFetch('/api/admin/ban','POST',{targetUsername:selected.username, banned:newBanned});
-  if (res.error) { showToast(res.error,'red'); return; }
-  showToast(newBanned?'🚫 '+selected.username+' banido':'✓ Ban removido de '+selected.username);
-  await loadUsers(); selectUser(selected.username);
+  if (!SEL) return;
+  const ban = !SEL.banned;
+  if (!confirm((ban ? 'Banir' : 'Remover ban de') + ' @' + SEL.username + '?')) return;
+  const d = await req('POST', '/api/admin/ban', { targetUsername: SEL.username, banned: ban });
+  if (!d) return;
+  if (d.error) { toast(d.error, 'red'); return; }
+  toast((ban ? '🚫 @' + SEL.username + ' banido' : '✓ Ban removido de @' + SEL.username));
+  await load(); select(SEL.username);
 }
 
-// ── EXPORT / IMPORT ──────────────────────────────────────────────────────────
+// ── DB EXPORT / IMPORT ────────────────────────────────────────────────────────
 function exportDB() {
-  window.open('/api/admin/export?token='+encodeURIComponent(ADMIN_TOKEN), '_blank');
+  window.open('/api/admin/export?token=' + encodeURIComponent(TOKEN), '_blank');
 }
 
-async function importDB(input) {
-  const file = input.files[0];
+async function importDB(inp) {
+  const file = inp.files[0];
   if (!file) return;
-  if (!confirm('Restaurar banco de dados de "'+file.name+'"?\nIsso SOBRESCREVE todos os dados atuais!')) {
-    input.value=''; return;
+  if (!confirm('Restaurar banco "' + file.name + '"?\nISSO SOBRESCREVE TODOS OS DADOS!')) {
+    inp.value = ''; return;
   }
-  const text = await file.text();
   let data;
-  try { data = JSON.parse(text); } catch(e) { showToast('JSON inválido!','red'); return; }
-  const res = await fetch('/api/admin/import', {
-    method:'POST',
-    headers:{'Authorization':'Bearer '+ADMIN_TOKEN,'Content-Type':'application/json'},
-    body: JSON.stringify(data)
-  }).then(r=>r.json());
-  if (res.error) { showToast('Erro: '+res.error,'red'); return; }
-  showToast('✓ Banco restaurado! '+res.users+' usuários importados.');
-  input.value='';
-  await loadUsers();
+  try { data = JSON.parse(await file.text()); } catch(e) { toast('JSON inválido!', 'red'); return; }
+  const d = await req('POST', '/api/admin/import', data);
+  if (!d) return;
+  if (d.error) { toast(d.error, 'red'); return; }
+  toast('✓ Banco restaurado! ' + d.users + ' usuários');
+  inp.value = '';
+  await load();
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────
-let _toastT;
-function showToast(msg, type) {
+let _tt;
+function toast(msg, type) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.style.display='block';
-  t.style.background = type==='red'?'#3a1a1a':'#1a3a1a';
-  t.style.color      = type==='red'?'#ff8888':'#70cc70';
-  t.style.borderColor= type==='red'?'#6a2a2a':'#2a6a2a';
-  clearTimeout(_toastT);
-  _toastT = setTimeout(()=>t.style.display='none', 3000);
+  t.style.display = 'block';
+  t.style.background = type === 'red' ? '#3a1a1a' : '#1a3a1a';
+  t.style.color      = type === 'red' ? '#ff9090' : '#90cc90';
+  t.style.border     = '1px solid ' + (type === 'red' ? '#6a2a2a' : '#2a6a2a');
+  clearTimeout(_tt);
+  _tt = setTimeout(() => t.style.display = 'none', 3000);
 }
 </script>
 </body>
