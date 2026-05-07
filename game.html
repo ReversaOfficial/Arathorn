@@ -981,6 +981,27 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 <!-- ═══════════════════════════════════════════════
      GAME SCREEN
 ═══════════════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════════════════════
+     INFIRMARY OVERLAY — Blocks all actions while KO
+═══════════════════════════════════════════════════════ -->
+<div id="ko-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.88);display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
+  <div style="max-width:360px;width:100%">
+    <div style="font-size:64px;margin-bottom:12px">🏥</div>
+    <div style="font-family:'Cinzel',serif;font-size:20px;color:var(--red-light);margin-bottom:8px">Na Enfermaria</div>
+    <div style="font-size:14px;color:var(--text-secondary);margin-bottom:20px">Você foi derrotado em combate e está se recuperando.<br>Você não pode realizar nenhuma ação.</div>
+    <div style="background:rgba(192,40,40,.15);border:1px solid rgba(192,40,40,.4);border-radius:var(--radius-lg);padding:16px;margin-bottom:20px">
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:6px">Tempo restante</div>
+      <div id="ko-overlay-timer" style="font-family:'Cinzel',serif;font-size:32px;font-weight:700;color:var(--red-light)">10:00</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-gold" style="font-family:Cinzel,serif;letter-spacing:1px;padding:14px" onclick="reviveNow()">💰 Pagar 3.000 ouro — Sair agora</button>
+      <button class="btn btn-green" style="padding:14px" onclick="buyRevivePix()">⚡ PIX R$2,99 — Curar na hora</button>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Ou aguarde o timer acabar</div>
+    </div>
+  </div>
+</div>
+
 <div id="screen-game" class="screen">
   <!-- TOP BAR -->
   <div class="topbar">
@@ -7117,22 +7138,24 @@ function registerChatSSEHandlers() {
 let _infirmaryTimerInt = null;
 
 function updateInfirmaryBanner() {
-  const banner    = document.getElementById('tav-infirmary-banner');
-  const timerEl   = document.getElementById('tav-infirmary-timer');
-  const globalInd = document.getElementById('global-infirmary-indicator');
+  const banner      = document.getElementById('tav-infirmary-banner');
+  const timerEl     = document.getElementById('tav-infirmary-timer');
+  const globalInd   = document.getElementById('global-infirmary-indicator');
   const globalTimer = document.getElementById('global-ko-timer');
+  const overlay     = document.getElementById('ko-overlay');
+  const overlayTimer= document.getElementById('ko-overlay-timer');
   const ko = G.knockedOutUntil && G.knockedOutUntil > Date.now();
 
   // Local taverna banner
   if (banner) banner.style.display = ko ? '' : 'none';
-
   // Global topbar indicator
   if (globalInd) globalInd.style.display = ko ? 'flex' : 'none';
+  // Full-screen KO overlay — blocks all actions
+  if (overlay) overlay.style.display = ko ? 'flex' : 'none';
 
-  // Also block mission start if KO (handled by isKnockedOut())
   if (!ko) {
     clearInterval(_infirmaryTimerInt);
-    if (G.knockedOutUntil > 0) { G.knockedOutUntil = 0; scheduleSave(); }
+    if ((G.knockedOutUntil||0) > 0) { G.knockedOutUntil = 0; scheduleSave(); }
     return;
   }
 
@@ -7142,15 +7165,21 @@ function updateInfirmaryBanner() {
     if (!left) {
       G.knockedOutUntil = 0;
       clearInterval(_infirmaryTimerInt);
-      updateInfirmaryBanner();
-      updateUI();
-      toast('✨ Recuperado! Pronto para batalhar novamente.', 'good');
+      // Reload full state from server then dismiss overlay
+      api('GET', '/api/load').then(lr => {
+        if (lr.gameState) { G = lr.gameState; }
+        if (overlay) overlay.style.display = 'none';
+        updateUI();
+        toast('✨ Recuperado! Pronto para batalhar novamente.', 'good');
+        updateInfirmaryBanner();
+      });
       return;
     }
     const mins = Math.floor(left/60000), secs = Math.floor((left%60000)/1000);
     const timeStr = mins+':'+String(secs).padStart(2,'0');
-    if (timerEl)    timerEl.textContent = timeStr;
-    if (globalTimer) globalTimer.textContent = '🏥 '+timeStr;
+    if (timerEl)      timerEl.textContent    = timeStr;
+    if (globalTimer)  globalTimer.textContent = '🏥 '+timeStr;
+    if (overlayTimer) overlayTimer.textContent = timeStr;
   };
   tick();
   _infirmaryTimerInt = setInterval(tick, 1000);
@@ -7162,11 +7191,22 @@ function navToTaverna() {
 }
 
 async function reviveNow() {
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = 'Pagando...'; }
   const res = await api('POST', '/api/tavern/revive');
+  if (btn) { btn.disabled = false; btn.textContent = '💰 Pagar 3.000 ouro — Sair agora'; }
   if (res.error) { toast(res.error, 'bad'); return; }
+  // Immediately clear KO state
   G.knockedOutUntil = 0;
   G.gold = res.newBalance;
-  toast('💊 Recuperado! Pronto para batalhar.', 'good');
+  if (res.newHp) G.hp = res.newHp;
+  else G.hp = getEffectiveStats().hpMax; // restore to full effective HP
+  // Dismiss overlay instantly
+  const overlay = document.getElementById('ko-overlay');
+  if (overlay) overlay.style.display = 'none';
+  clearInterval(_infirmaryTimerInt);
+  toast('💊 Recuperado! HP restaurado. Pronto para batalhar!', 'good');
+  addLog('💊 Pagou 3.000 ouro e saiu da enfermaria.', 'info');
   updateInfirmaryBanner();
   updateUI();
   forceSave();
@@ -7356,34 +7396,39 @@ function registerTavernSSEHandlers() {
       addLog('💀 Perdeu duelo para '+d.vs+'. -10 '+statTxt+'. KO 10min.','bad');
     }
 
-    // Reload state first
+    // If lost: immediately set KO locally so overlay appears right away
+    if (!isWin && d.knockedOutUntil) {
+      G.knockedOutUntil = d.knockedOutUntil;
+      G.hp = 0;
+      updateInfirmaryBanner(); // shows overlay immediately
+    }
+
+    // Reload full state from server
     api('GET','/api/load').then(lr=>{
       if (lr.gameState) { G = lr.gameState; updateUI(); updateInfirmaryBanner(); }
 
-      // Show modal with result
+      // Show result modal on top of overlay (for winner) or embedded info (for loser)
       showModal(
         icon + (isWin ? ' Vitória no Duelo!' : ' Derrota no Duelo!'),
         '<div style="text-align:center">'
         + '<div style="font-size:36px;margin-bottom:8px">'+(isWin?'🏆':'💀')+'</div>'
         + (isWin
           ? '<div style="font-size:14px;color:var(--green-light);font-weight:700;margin-bottom:8px">Você venceu '+d.vs+'!</div>'
-          : '<div style="font-size:14px;color:var(--red-light);font-weight:700;margin-bottom:8px">'+d.vs+' te derrotou!</div>')
+          : '<div style="font-size:14px;color:var(--red-light);font-weight:700;margin-bottom:8px">'+d.vs+' te derrotou — você está na Enfermaria!</div>')
         + '<div style="font-size:13px;margin:12px 0;padding:10px;background:var(--bg-dark);border-radius:var(--radius)">'
         +   '<div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">ALTERAÇÃO DE STATUS</div>'
         +   '<div style="font-size:24px;font-weight:700;color:'+color+';font-family:Cinzel,serif">'+delta+statTxt+'</div>'
         + '</div>'
         + (!isWin
-          ? '<div style="font-size:12px;color:var(--red-light);padding:8px;background:rgba(192,40,40,.1);border-radius:var(--radius)">'
-            + '🏥 Você está na Enfermaria por 10 minutos<br><small>Vá à Taverna para pagar 3.000 ouro e sair antes</small>'
+          ? '<div style="font-size:13px;color:var(--red-light);padding:10px;background:rgba(192,40,40,.1);border-radius:var(--radius)">'
+            + '🏥 <b>Enfermaria por 10 minutos</b><br>'
+            + '<small>Pague 3.000 ouro ou R$2,99 via PIX para sair imediatamente</small>'
             + '</div>'
           : '')
         + '</div>',
-        [{ label: isWin ? '✓ Continuar' : '🏥 Ir à Taverna', cls: isWin ? 'btn-gold' : 'btn-red', fn: () => {
+        [{ label: isWin ? '✓ Continuar' : '🏥 Ver opções', cls: isWin ? 'btn-gold' : 'btn-red', fn: () => {
           closeModal();
-          if (!isWin) {
-            const tavNav = document.querySelector('[data-page="taverna"]');
-            if (tavNav) navTo(tavNav);
-          }
+          // overlay stays visible for loser — they can use the overlay buttons
         }}]
       );
     });
@@ -7848,10 +7893,13 @@ function openPixModal(data, product) {
   document.getElementById('pix-product-name').textContent = product.name;
   document.getElementById('pix-price-display').textContent = 'R$ ' + product.price.toFixed(2).replace('.',',');
 
-  // QR Code image
+  // QR Code image — suporta base64 ou URL direta
   const qrImg = document.getElementById('pix-qr-img');
   if (data.pixQrCodeBase64) {
     qrImg.src = 'data:image/png;base64,' + data.pixQrCodeBase64;
+    document.getElementById('pix-qr-wrap').style.display = 'flex';
+  } else if (data.pixQrCodeUrl) {
+    qrImg.src = data.pixQrCodeUrl;
     document.getElementById('pix-qr-wrap').style.display = 'flex';
   } else {
     document.getElementById('pix-qr-wrap').style.display = 'none';
@@ -7863,7 +7911,7 @@ function openPixModal(data, product) {
 
   // Status
   const statusEl = document.getElementById('pix-status');
-  if (statusEl) statusEl.innerHTML = '⏳ Aguardando pagamento... Escaneie o QR ou copie o código.';
+  if (statusEl) statusEl.innerHTML = '⏳ Aguardando pagamento... Escaneie o QR Code ou copie o código PIX abaixo.';
 
   // Countdown timer
   clearInterval(_pixTimerInt);
@@ -7947,9 +7995,14 @@ function registerShopSSEHandlers() {
     }
     if (d.rewards && d.rewards.infirmaryRelease) {
       G.knockedOutUntil = 0;
-      if (d.rewards.hpFull) G.hp = (G.effectiveHpMax || G.hpMax);
+      if (d.rewards.hpFull) G.hp = getEffectiveStats().hpMax;
+      // Dismiss overlay immediately — no waiting
+      const koOverlay = document.getElementById('ko-overlay');
+      if (koOverlay) koOverlay.style.display = 'none';
+      clearInterval(_infirmaryTimerInt);
       updateInfirmaryBanner();
-      toast('💊 Curado! Você saiu da enfermaria.', 'good');
+      toast('💊 PIX confirmado! Curado e pronto para batalhar!', 'good');
+      addLog('💊 PIX R$2,99 — saiu da enfermaria curado!', 'good');
     }
     // Full reload to sync everything
     api('GET', '/api/load').then(lr => {

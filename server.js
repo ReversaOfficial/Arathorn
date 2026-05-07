@@ -1738,13 +1738,13 @@ async function handleRequest(req, res) {
     if (!winG.log) winG.log=[];
     winG.log.unshift({msg:'⚔ Duelo na Taverna: venceu contra '+loseG.name+'! +10 '+winStat.toUpperCase(), cls:'good'});
 
-    // Loser: -10 random stat (min 1) + infirmary 10min
+    // Loser: -10 random stat (min 1) + infirmary 10min, HP = 0
     const loseStat = randStat();
     loseG[loseStat] = Math.max(1, (loseG[loseStat]||10) - 10);
     if (!loseG.stats) loseG.stats={};
     loseG.stats.pvpLosses = (loseG.stats.pvpLosses||0)+1;
     loseG.knockedOutUntil = Date.now() + 10*60*1000; // 10 min
-    loseG.hp = Math.max(1, Math.floor(loseG.hpMax * 0.1)); // reduced to 10% hp
+    loseG.hp = 0; // HP zerado ao perder PvP
     if (!loseG.log) loseG.log=[];
     loseG.log.unshift({msg:'💀 Duelo na Taverna: perdeu para '+winG.name+'. -10 '+loseStat.toUpperCase()+'. Enfermaria 10min.', cls:'bad'});
 
@@ -1770,11 +1770,11 @@ async function handleRequest(req, res) {
     if ((g.gold||0) < REVIVE_COST) { send(res,400,{error:'Precisa de 3.000 ouro para reviver agora.'}); return; }
     g.gold -= REVIVE_COST;
     g.knockedOutUntil = 0;
-    g.hp = g.hpMax;
+    g.hp = Math.max(g.hpMax, g.effectiveHpMax || 0); // restore to full effective HP
     if (!g.log) g.log=[];
-    g.log.unshift({msg:'💊 Pagou 3.000 ouro para sair da enfermaria.', cls:'info'});
+    g.log.unshift({msg:'💊 Pagou 3.000 ouro para sair da enfermaria — HP restaurado!', cls:'info'});
     saveDB(db);
-    send(res,200,{ok:true, newBalance:g.gold}); return;
+    send(res,200,{ok:true, newBalance:g.gold, newHp:g.hp}); return;
   }
 
 
@@ -2313,13 +2313,16 @@ async function handleRequest(req, res) {
   //      (no painel do Mercado Pago → Webhooks → Adicionar)
   // ═══════════════════════════════════════════════════════════════════════
 
-  // ── AbacatePay config ──────────────────────────────────────────────────────
-  // 1. Acesse app.abacatepay.com → API Keys → criar chave de produção
-  // 2. Adicione no Railway: ABACATEPAY_API_KEY = abacate_live_xxxxxx
-  // 3. Configure webhook no dashboard AbacatePay → Webhooks → Add
-  //    URL: https://seu-app.up.railway.app/api/shop/webhook
-  //    Evento: billing.paid
-  const ABACATE_API_KEY = process.env.ABACATEPAY_API_KEY || '';
+  // ── Mercado Pago config ─────────────────────────────────────────────────────
+  // Conta PESSOA FÍSICA com CPF — sem necessidade de CNPJ
+  // 1. Crie conta em mercadopago.com.br com seu CPF
+  // 2. Acesse mercadopago.com.br/developers → Suas integrações → Criar app
+  // 3. Em Credenciais de produção → copie o Access Token (começa com APP_USR-)
+  // 4. Adicione no Railway: MP_ACCESS_TOKEN = APP_USR-xxxxxxxxxxxx
+  // 5. Configure webhook: MP Developers → Webhooks → Criar → URL abaixo
+  //    https://seu-app.up.railway.app/api/shop/webhook
+  //    Tópico: Pagamentos
+  const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || '';
   const BASE_URL = process.env.BASE_URL || 'https://seudominio.up.railway.app';
 
   // Catálogo de produtos
@@ -2468,110 +2471,124 @@ async function handleRequest(req, res) {
     const product = SHOP_CATALOG[productId];
     if (!product) { send(res, 404, { error: 'Produto nao encontrado.' }); return; }
 
-    if (!ABACATE_API_KEY) {
-      send(res, 500, { error: 'Pagamento nao configurado. Fale com o admin.' }); return;
+    if (!MP_ACCESS_TOKEN) {
+      send(res, 500, { error: 'Pagamento nao configurado. Adicione MP_ACCESS_TOKEN no Railway.' }); return;
     }
 
     const db = loadDB();
     const user = db.users[username];
     if (!user || !user.gameState) { send(res, 400, { error: 'Personagem nao encontrado.' }); return; }
 
-    // AbacatePay — POST /v1/pixQrCode/create
-    // amount em CENTAVOS, expiresIn em SEGUNDOS
+    // Mercado Pago PIX — funciona com conta CPF (pessoa física)
     try {
-      const externalId = username + '|' + productId + '|' + Date.now();
-      const abacateBody = {
-        amount:      Math.round(product.price * 100), // R$ → centavos
-        expiresIn:   1800,                             // 30 minutos
-        description: 'Terras de Arathorn — ' + product.name,
-        metadata: { externalId }
+      const idempotencyKey = username + '_' + productId + '_' + Date.now();
+      const mpBody = {
+        transaction_amount: product.price,
+        description: 'Terras de Arathorn - ' + product.name,
+        payment_method_id: 'pix',
+        date_of_expiration: new Date(Date.now() + 30*60*1000).toISOString(), // 30 min
+        payer: {
+          email: (user.email || username + '@arathorn.game'),
+          first_name: (user.gameState.name || username).split(' ')[0],
+          last_name:  'Arathorn',
+          identification: { type: 'CPF', number: '00000000000' }
+        },
+        external_reference: idempotencyKey,
+        notification_url: BASE_URL + '/api/shop/webhook',
       };
 
-      const abRes = await fetch('https://api.abacatepay.com/v1/pixQrCode/create', {
+      console.log('[SHOP] MP PIX request para:', username, product.name, 'R$'+product.price);
+
+      const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
         method: 'POST',
         headers: {
-          'Content-Type':  'application/json',
-          'Authorization': 'Bearer ' + ABACATE_API_KEY,
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + MP_ACCESS_TOKEN,
+          'X-Idempotency-Key': idempotencyKey,
         },
-        body: JSON.stringify(abacateBody)
+        body: JSON.stringify(mpBody)
       });
 
-      const abData = await abRes.json();
+      const mpData = await mpRes.json();
 
-      if (!abRes.ok || !abData.data || !abData.data.brCode) {
-        console.error('[SHOP] AbacatePay error:', JSON.stringify(abData));
-        send(res, 500, { error: 'Erro ao gerar PIX. Tente novamente.' }); return;
+      if (!mpRes.ok || !mpData.point_of_interaction) {
+        console.error('[SHOP] MP error:', mpData.message || JSON.stringify(mpData).slice(0,200));
+        send(res, 500, { error: 'Erro ao gerar PIX: ' + (mpData.message || 'tente novamente') }); return;
       }
 
-      const pix = abData.data;
+      const pix = mpData.point_of_interaction.transaction_data;
+      const paymentId = String(mpData.id);
 
       // Salvar pedido pendente
       if (!db.pendingOrders) db.pendingOrders = {};
-      db.pendingOrders[pix.id] = {
-        paymentId:  pix.id,
-        externalId,
+      db.pendingOrders[paymentId] = {
+        paymentId,
+        externalRef: idempotencyKey,
         username,
         productId,
-        price:      product.price,
-        status:     'pending',
-        createdAt:  Date.now(),
-        expiresAt:  Date.now() + 30 * 60 * 1000,
+        price: product.price,
+        status: 'pending',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 60 * 1000,
       };
       saveDB(db);
 
-      // brCodeBase64 já vem com o prefixo data:image/png;base64,
-      const qrBase64 = pix.brCodeBase64
-        ? pix.brCodeBase64.replace(/^data:image\/png;base64,/, '')
-        : null;
+      console.log('[SHOP] PIX criado:', paymentId, 'para', username);
 
       send(res, 200, {
         ok:              true,
-        paymentId:       pix.id,
-        pixCopiaECola:   pix.brCode,
-        pixQrCodeBase64: qrBase64,
+        paymentId:       paymentId,
+        pixCopiaECola:   pix.qr_code,
+        pixQrCodeBase64: pix.qr_code_base64 || null,
         price:           product.price,
         productName:     product.name,
         expiresIn:       1800,
       });
     } catch(e) {
-      console.error('[SHOP] AbacatePay fetch error:', e.message);
-      send(res, 500, { error: 'Erro de conexao com AbacatePay.' });
+      console.error('[SHOP] MP fetch error:', e.message);
+      send(res, 500, { error: 'Erro de conexao com Mercado Pago.' });
     }
     return;
   }
 
-  // ── POST /api/shop/webhook — AbacatePay webhook ──────────────────────────
-  // AbacatePay envia: { event: 'billing.paid', data: { billing: { id, status, metadata } } }
+  // ── POST /api/shop/webhook — Mercado Pago webhook ───────────────────────
+  // MP envia: { action: 'payment.updated', data: { id: '123456' } }
   if (method === 'POST' && url.startsWith('/api/shop/webhook')) {
     const body = await readBody(req);
-    console.log('[WEBHOOK] Recebido:', JSON.stringify(body).slice(0, 200));
+    console.log('[WEBHOOK] Recebido:', body.action || body.type || 'unknown', body.data?.id || '');
 
-    // Só processar evento de pagamento confirmado
-    const event = body.event || '';
-    if (event !== 'billing.paid' && event !== 'pixQrCode.paid') {
+    // MP: só processar payment.updated ou payment.created
+    const action = body.action || body.type || '';
+    if (action !== 'payment.updated' && action !== 'payment.created' && action !== 'payment') {
       send(res, 200, { ok: true }); return;
     }
 
-    // Extrair ID do pagamento
-    // AbacatePay pode enviar: data.billing.id ou data.pixQrCode.id
-    const billing = (body.data && (body.data.billing || body.data.pixQrCode)) || {};
-    const paymentId = billing.id || null;
-
+    const paymentId = String((body.data && body.data.id) ? body.data.id : '');
     if (!paymentId) {
-      console.warn('[WEBHOOK] Sem paymentId no payload');
       send(res, 200, { ok: true }); return;
     }
 
+    // Verificar status no Mercado Pago
     try {
+      const mpCheck = await fetch('https://api.mercadopago.com/v1/payments/' + paymentId, {
+        headers: { 'Authorization': 'Bearer ' + MP_ACCESS_TOKEN }
+      });
+      const mpData = await mpCheck.json();
+      console.log('[WEBHOOK] MP status:', mpData.status, 'id:', paymentId);
+
+      if (mpData.status !== 'approved') {
+        send(res, 200, { ok: true }); return;
+      }
+
       const db = loadDB();
       if (!db.pendingOrders) db.pendingOrders = {};
 
-      // Encontrar pedido pelo paymentId
+      // Encontrar pedido pelo paymentId ou external_reference
       let order = db.pendingOrders[paymentId];
-
-      // Fallback: buscar por externalId nos metadados
-      if (!order && billing.metadata && billing.metadata.externalId) {
-        order = Object.values(db.pendingOrders).find(o => o.externalId === billing.metadata.externalId);
+      if (!order && mpData.external_reference) {
+        order = Object.values(db.pendingOrders).find(o =>
+          o.externalRef === mpData.external_reference || o.paymentId === paymentId
+        );
       }
 
       if (!order) {
