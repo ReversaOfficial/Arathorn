@@ -875,6 +875,13 @@ async function handleRequest(req, res) {
       if (Array.isArray(gameState.inventory)   && gameState.inventory.length   > 500) gameState.inventory   = gameState.inventory.slice(0, 500);
       if (Array.isArray(gameState.consumables) && gameState.consumables.length > 200) gameState.consumables = gameState.consumables.slice(0, 200);
       if (Array.isArray(gameState.log)         && gameState.log.length         > 100) gameState.log         = gameState.log.slice(0, 100);
+      // FRIENDS: always use server-authoritative list — never let client overwrite
+      // Merge: take the server list, add any new friends client claims (validate they exist)
+      const serverFriends = existing.friends || [];
+      const clientFriends = Array.isArray(gameState.friends) ? gameState.friends : [];
+      // Only keep client friends that are also in the server list (prevents fake adds)
+      const merged = [...new Set([...serverFriends, ...clientFriends.filter(f => serverFriends.includes(f))])];
+      gameState.friends = merged;
 
     } else {
       // ── FIRST SAVE (character creation) ────────────────────────────────

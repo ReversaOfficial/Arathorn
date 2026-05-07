@@ -5107,6 +5107,10 @@ async function pollOnline() {
   if (res.players) updateOnlineList(res.players);
   // Also check friend requests
   loadFriendRequests();
+  // Sync friends list from server on every poll
+  api('GET', '/api/friends/list').then(fr => {
+    if (fr.friends) G.friends = fr.friends.map(f => f.username);
+  });
   // Also check for pending duels
   const dr = await api('GET', '/api/duel/list');
   if (dr.duels) {
@@ -6160,8 +6164,9 @@ async function renderFriendsList() {
       + '</div>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +   '<button class="btn btn-sm" data-user="'+f.username+'" data-name="'+f.name+'" onclick="openPublicProfileByData(this)" title="Ver perfil">👤</button>'
+      +   '<button class="btn btn-sm" style="background:rgba(40,100,200,.2);border-color:rgba(40,100,200,.5);color:#80b0ff" data-user="'+f.username+'" onclick="startDirectChat(this.dataset.user)" title="Chat privado">💬</button>'
       +   '<button class="btn btn-sm btn-gold" data-user="'+f.username+'" data-name="'+f.name.replace(/'/g,'')+'" onclick="quickFillSend(this)" title="Enviar ouro">💸</button>'
-      +   '<button class="btn btn-sm btn-red" data-user="'+f.username+'" onclick="removeFriend(this)" title="Remover">✕</button>'
+      +   '<button class="btn btn-sm btn-red" data-user="'+f.username+'" onclick="removeFriend(this)" title="Desfazer amizade">✕</button>'
       + '</div>'
       + '</div>';
   }).join('') + '</div>';
@@ -6227,14 +6232,15 @@ async function sendFriendRequest(btn) {
 }
 
 async function respondFriendReq(btn, accept) {
+  btn.disabled = true;
   const fromUsername = btn.dataset.from;
   const res = await api('POST', '/api/friends/respond', { fromUsername, accept });
-  if (res.error) { toast(res.error, 'bad'); return; }
-  toast(accept ? '✅ Amigo adicionado!' : 'Solicitação recusada.', accept?'good':'info');
+  if (res.error) { toast(res.error, 'bad'); btn.disabled=false; return; }
+  toast(accept ? '✅ '+fromUsername+' agora é seu amigo!' : 'Solicitação recusada.', accept?'good':'info');
   if (accept) {
-    if (!G.friends) G.friends = [];
-    if (!G.friends.includes(fromUsername)) G.friends.push(fromUsername);
-    scheduleSave();
+    // Reload from server — source of truth for friends list
+    const lr = await api('GET', '/api/load');
+    if (lr.gameState) { G = lr.gameState; }
   }
   await loadFriendRequests();
   if (accept) renderFriendsList();
@@ -6242,13 +6248,33 @@ async function respondFriendReq(btn, accept) {
 
 async function removeFriend(btn) {
   const targetUsername = btn.dataset.user;
-  if (!confirm('Remover '+targetUsername+' da lista de amigos?')) return;
+  if (!confirm('Desfazer amizade com @'+targetUsername+'? Esta ação remove vocês da lista um do outro.')) return;
+  btn.disabled = true;
   const res = await api('POST', '/api/friends/remove', { targetUsername });
-  if (res.error) { toast(res.error,'bad'); return; }
-  if (G.friends) G.friends = G.friends.filter(f=>f!==targetUsername);
-  toast('Amigo removido.','info');
-  scheduleSave();
+  if (res.error) { toast(res.error,'bad'); btn.disabled=false; return; }
+  // Reload from server
+  const lr = await api('GET', '/api/load');
+  if (lr.gameState) G = lr.gameState;
+  toast('Amizade desfeita com @'+targetUsername+'.','info');
   renderFriendsList();
+}
+
+async function startDirectChat(targetUsername) {
+  // Navigate to chat and open/create DM with this friend
+  const chatNav = document.querySelector('[data-page="chat"]');
+  if (chatNav) navTo(chatNav);
+  // Create or find DM room
+  setTimeout(async () => {
+    const res = await api('POST', '/api/chat/room/create', { type: 'dm', targetUsername });
+    if (res.error) { toast(res.error,'bad'); return; }
+    const roomId = res.roomId || res.room?.id;
+    if (roomId) {
+      _activeRoomId = roomId;
+      // Find room in list or reload
+      await loadChatRooms();
+      openChatRoom(roomId);
+    }
+  }, 200);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -6627,9 +6653,23 @@ function registerFriendSSEHandlers() {
     const d = JSON.parse(e.data);
     if (d.to === AUTH.username) {
       toast('✅ '+d.byName+' aceitou sua solicitação de amizade!','good');
-      if (!G.friends) G.friends=[];
-      if (!G.friends.includes(d.by)) G.friends.push(d.by);
-      scheduleSave();
+      addLog('✅ '+d.byName+' aceitou sua amizade!','good');
+      // Reload full state — server already saved the friendship
+      api('GET','/api/load').then(lr=>{ if(lr.gameState){ G=lr.gameState; } });
+      // Refresh friends list if on that page
+      const pg = document.getElementById('page-amigos');
+      if (pg && pg.classList.contains('active')) renderFriendsList();
+    }
+  });
+  sseConn.addEventListener('friend_request', e => {
+    const d = JSON.parse(e.data);
+    if (d.to === AUTH.username) {
+      toast('👥 '+d.fromName+' quer ser seu amigo!','info');
+      addLog('👥 Solicitação de amizade de '+d.fromName,'info');
+      loadFriendRequests();
+      // Badge
+      const badge = document.getElementById('amigos-badge');
+      if (badge) { badge.style.display=''; badge.textContent='!'; }
     }
   });
   // Secure trade events
