@@ -1900,50 +1900,131 @@ async function handleRequest(req, res) {
   // RAID COMPLETE — Drop 2 Prist stones split among raid participants
   // Client sends the list of participants after a raid win
   // ═══════════════════════════════════════════════════════════════════════
-  if (method === 'POST' && url === '/api/raid/complete') {
+  // /api/raid/complete — legacy, redirects to v2 logic
+  // /api/raid/complete-v2 — full raid with gold + XP + drops
+  if (method === 'POST' && (url === '/api/raid/complete' || url === '/api/raid/complete-v2')) {
     const username = verifyToken(getToken(req));
     if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
-    const { participants } = await readBody(req);  // array of usernames
-    if (!Array.isArray(participants) || participants.length < 1) { send(res,400,{error:'Participants necessario.'}); return; }
+    const body = await readBody(req);
+    const roomId = body.roomId;
     const db = loadDB();
-    if (!db.globalStats) db.globalStats = { totalMissions: 0, pristMilestone: 0, ravikaMilestone: 0 };
-    db.globalStats.totalMissions++;
 
-    // Pick 2 random winners from participants (no repeats)
-    const pool = [...participants];
-    const winners = [];
-    const STONES_TO_DROP = Math.min(2, pool.length);
-    while (winners.length < STONES_TO_DROP && pool.length > 0) {
-      const idx = Math.floor(Math.random() * pool.length);
-      winners.push(pool.splice(idx, 1)[0]);
+    // Find room
+    const room = roomId && db.raidRooms && db.raidRooms[roomId];
+
+    // Legacy path — participants array
+    if (!room && Array.isArray(body.participants)) {
+      const participants = body.participants;
+      if (!db.globalStats) db.globalStats = {};
+      db.globalStats.totalMissions = (db.globalStats.totalMissions||0) + 1;
+      const pool = [...participants];
+      const winners = [];
+      while (winners.length < Math.min(2, pool.length)) {
+        const idx = Math.floor(Math.random() * pool.length);
+        winners.push(pool.splice(idx,1)[0]);
+      }
+      const results = [];
+      for (const wu of winners) {
+        const wUser = db.users[wu.toLowerCase()];
+        if (!wUser||!wUser.gameState) continue;
+        const g = wUser.gameState;
+        const goldEach = Math.floor(5000 + Math.random()*10000);
+        const xpEach   = Math.floor(2000 + Math.random()*5000);
+        g.gold = (g.gold||0) + goldEach;
+        g.xp   = (g.xp||0)   + xpEach;
+        applyServerLevelUps(g);
+        if (!g.consumables) g.consumables = [];
+        g.consumables.push('prist_m');
+        if (!g.log) g.log = [];
+        g.log.unshift({ msg: '🌋 Raid: +'+goldEach+' ouro +'+xpEach+' XP + Prist Reforçada!', cls:'good' });
+        results.push({ username: wu, name: g.name, stone: 'prist_m', gold: goldEach, xp: xpEach });
+        sendSSE(wu.toLowerCase(), 'raid_stone_drop', { stone:'prist_m', stoneName:'Prist Reforçada 🔷', gold:goldEach, xp:xpEach });
+      }
+      saveDB(db);
+      const winnerNames = results.map(r=>r.name).join(', ');
+      participants.forEach(p => sendSSE(p.toLowerCase(),'raid_result',{ winners:results, msg:'🌋 Raid concluída! '+winnerNames }));
+      send(res, 200, { ok:true, winners:results }); return;
     }
 
-    const results = [];
-    for (const winnerUsername of winners) {
-      const wUser = db.users[winnerUsername.toLowerCase()];
-      if (!wUser || !wUser.gameState) continue;
-      const g = wUser.gameState;
-      if (!g.consumables) g.consumables = [];
-      // Raid drops Prist Reforçada (better stone)
-      g.consumables.push('prist_m');
-      if (!g.log) g.log = [];
-      g.log.unshift({ msg: '🌋 Raid concluída! Você recebeu: Prist Reforçada 🔷', cls:'good' });
-      results.push({ username: winnerUsername, name: g.name, stone: 'prist_m' });
-      sendSSE(winnerUsername.toLowerCase(), 'raid_stone_drop', { stone: 'prist_m', stoneName: 'Prist Reforçada 🔷' });
-    }
+    // New room-based path
+    if (!room) { send(res,404,{error:'Sala de raid nao encontrada.'}); return; }
+    if (room.leader !== username) { send(res,403,{error:'Apenas o lider finaliza.'}); return; }
+    if (room.status !== 'active') { send(res,400,{error:'Raid nao esta ativa.'}); return; }
 
-    saveDB(db);
+    const RAID_CATALOG = {
+      raid_duo:   { slots:2, boss:{name:'Trollano'},    gold:[3000,6000],    xp:[2500,5000],    drops:['prist_s'],       bonusDrop:{item:'r1',chance:.30} },
+      raid_trio:  { slots:3, boss:{name:'Vorgath'},     gold:[12000,25000],  xp:[10000,20000],  drops:['prist_m'],       bonusDrop:{item:'re2',chance:.25} },
+      raid_squad: { slots:4, boss:{name:'Molkrath'},    gold:[40000,80000],  xp:[35000,65000],  drops:['ravika_s'],      bonusDrop:{item:'ran3',chance:.20} },
+      raid_full:  { slots:5, boss:{name:"Zar'oth"},     gold:[120000,250000],xp:[100000,200000],drops:['ravika_m'],      bonusDrop:{item:'ew3_epc',chance:.15} },
+    };
 
-    // Notify all participants of results
-    const winnerNames = results.map(r => r.name).join(', ');
-    participants.forEach(p => {
-      sendSSE(p.toLowerCase(), 'raid_result', {
-        winners: results,
-        msg: '🌋 Raid concluída! Pedras para: ' + (winnerNames || 'ninguém') + '.'
-      });
+    const raidDef = RAID_CATALOG[room.raidId];
+    if (!raidDef) { send(res,400,{error:'Raid invalida.'}); return; }
+
+    // Combined power
+    let totalPower = 0;
+    room.members.forEach(m => {
+      const u = db.users[m.username];
+      if (u&&u.gameState) totalPower += calcPower(u.gameState);
     });
+    const bossPower = Math.round(raidDef.gold[1] * 2);
+    const winChance = Math.min(0.92, Math.max(0.15, 0.50 + (totalPower - bossPower) / Math.max(1,bossPower) * 0.5));
+    const won = Math.random() < winChance;
 
-    send(res, 200, { ok: true, winners: results, totalParticipants: participants.length });
+    room.status = 'done';
+    room.won = won;
+    const n = room.members.length;
+    const results = [];
+
+    if (won) {
+      const xpTotal   = Math.round(raidDef.xp[0]   + Math.random()*(raidDef.xp[1]-raidDef.xp[0]));
+      const goldTotal = Math.round(raidDef.gold[0]  + Math.random()*(raidDef.gold[1]-raidDef.gold[0]));
+      const xpEach    = Math.round(xpTotal  / n);
+      const goldEach  = Math.round(goldTotal / n);
+      const bonusWinner = Math.random() < raidDef.bonusDrop.chance
+        ? room.members[Math.floor(Math.random()*n)].username : null;
+
+      room.members.forEach((m, i) => {
+        const u = db.users[m.username];
+        if (!u||!u.gameState) return;
+        const g = u.gameState;
+        g.gold = (g.gold||0) + goldEach;
+        g.xp   = (g.xp||0)  + xpEach;
+        g.stats = g.stats||{};
+        g.stats.missions = (g.stats.missions||0)+1;
+        applyServerLevelUps(g);
+        if (!g.consumables) g.consumables = [];
+        const stone = raidDef.drops[i % raidDef.drops.length];
+        g.consumables.push(stone);
+        let bonusItem = null;
+        if (bonusWinner === m.username) { bonusItem = raidDef.bonusDrop.item; if (!g.inventory) g.inventory=[]; g.inventory.push(bonusItem); }
+        if (!db.raidCooldowns) db.raidCooldowns = {};
+        db.raidCooldowns[m.username+'_'+room.raidId] = Date.now();
+        if (!g.log) g.log=[];
+        g.log.unshift({ msg:'🌋 Raid '+raidDef.boss.name+': +'+goldEach+' ouro +'+xpEach+' XP'+(bonusItem?' 🎁 item épico!':''), cls:'good' });
+        results.push({ username:m.username, name:m.name, xp:xpEach, gold:goldEach, stone, bonusItem });
+        sendSSE(m.username, 'raid_complete', { won:true, xp:xpEach, gold:goldEach, stone, bonusItem, bossName:raidDef.boss.name, totalPower, bossPower });
+      });
+    } else {
+      const xpConsole = Math.round(raidDef.xp[0]*0.10/n);
+      room.members.forEach(m => {
+        const u = db.users[m.username];
+        if (!u||!u.gameState) return;
+        const g = u.gameState;
+        g.xp = (g.xp||0) + xpConsole;
+        applyServerLevelUps(g);
+        if (!db.raidCooldowns) db.raidCooldowns={};
+        db.raidCooldowns[m.username+'_'+room.raidId] = Date.now();
+        if (!g.log) g.log=[];
+        g.log.unshift({ msg:'🌋 Derrota na Raid '+raidDef.boss.name+'. +'+xpConsole+' XP consolação.', cls:'bad' });
+        results.push({ username:m.username, name:m.name, xp:xpConsole, gold:0 });
+        sendSSE(m.username, 'raid_complete', { won:false, xp:xpConsole, gold:0, bossName:raidDef.boss.name, totalPower, bossPower });
+      });
+    }
+
+    setTimeout(() => { const d=loadDB(); if(d.raidRooms) delete d.raidRooms[roomId]; saveDB(d); }, 5*60*1000);
+    saveDB(db);
+    send(res, 200, { ok:true, won, results, totalPower, bossPower, winChance:Math.round(winChance*100) });
     return;
   }
 

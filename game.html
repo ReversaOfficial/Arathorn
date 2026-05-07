@@ -4411,33 +4411,39 @@ function finalizeCombat(won, m, enemyName, finalHp, clog) {
     }
 
     if (isPartyLeader) {
-      // ── PARTY LEADER: distribute via server ──────────────────────────
+      // ── PARTY LEADER: apply locally first, then distribute via server ─
+      G.gold += gold;
+      gainXP(xp);
       api('POST', '/api/party/distribute', {
         totalXp: xp, totalGold: gold, missionName: m.name
       }).then(res => {
         if (res && res.ok) {
+          // Reload to get exact split values and member level ups
           api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
         }
       }).catch(() => {});
-      addLog('🤝 Recompensas distribuídas para a party!', 'good');
+      addLog('🤝 Recompensas distribuídas! +' + gold + ' ouro +' + xp + ' XP', 'good');
 
     } else if (isClanMission && G.clanName) {
-      // ── CLAN MISSION: distribute XP + gold equally via server ────────
+      // ── CLAN MISSION: apply locally first for instant feedback ───────
+      // Server distributes to all members equally and handles level ups
+      // We apply a local share estimate first, then sync with server
+      G.gold += gold;  // apply full gold locally (server will equalize across members)
+      gainXP(xp);      // apply XP + level up locally
+
       api('POST', '/api/clan/mission/distribute', {
         totalXp: xp, totalGold: gold, missionName: m.name, missionId: m.id
       }).then(res => {
         if (res && res.ok) {
+          const myGold = res.myShare ? res.myShare.gold : gold;
           const myXp   = res.myShare ? res.myShare.xp   : xp;
-          const myGold = res.myShare ? res.myShare.gold  : gold;
-          clog('🛡 XP de clã distribuído! Você recebeu +' + myXp + ' XP e +' + myGold + ' ouro', 'var(--purple-light)');
+          clog('🛡 Clã "' + m.name + '": +' + myGold + ' ouro +' + myXp + ' XP (distribuído)', 'var(--purple-light)');
+          // Reload to get exact server values (level ups, other members' bonuses)
           api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); } });
-        } else {
-          // Fallback: apply locally if server call fails
-          G.gold += gold;
-          gainXP(xp);
         }
-      }).catch(() => { G.gold += gold; gainXP(xp); });
-      addLog('🛡 Missão de clã "' + m.name + '" completada! Distribuindo recompensas...', 'good');
+        // No fallback needed — already applied locally above
+      }).catch(() => {}); // already applied locally
+      addLog('🛡 Missão de clã "' + m.name + '" completada! +' + gold + ' ouro +' + xp + ' XP', 'good');
 
     } else {
       // ── SOLO (or party non-leader): apply locally ─────────────────────
