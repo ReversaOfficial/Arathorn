@@ -3429,20 +3429,27 @@ function renderMap() {
     const onclick = locked ? '' : "selectZone('" + z.id + "')";
     const lockBadge = locked ? '<div style="font-size:10px;color:var(--red-light);margin-top:2px">Nv.' + z.minLv + '+ necessario</div>' : '';
     const activeBadge = active ? '<div style="font-size:10px;color:var(--gold);margin-top:2px">Atual</div>' : '';
+    const mCount = MISSIONS.filter(m => m.zone === z.id && m.type === 'solo').length;
     return '<div class="map-zone' + (locked?' locked':'') + (active?' active-zone':'') + '" onclick="' + onclick + '">'
-      + '<div class="map-zone-icon">' + z.icon + '</div>'
+      + '<div class="map-zone-icon">' + (locked ? '🔒' : z.icon) + '</div>'
       + '<div class="map-zone-name">' + z.name + '</div>'
       + '<div class="map-zone-level">Nv. ' + z.minLv + '-' + z.maxLv + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:1px">' + mCount + ' missões</div>'
       + lockBadge + activeBadge
       + '</div>';
   }).join('');
 }
 function selectZone(id) {
-  G.currentZone = id;
   const z = ZONES.find(z => z.id===id);
+  if (!z) return;
+  if (G.level < z.minLv) { toast('🔒 Nível '+z.minLv+' necessário para '+z.name+'!','bad'); return; }
+  G.currentZone = id;
   toast('🗺️ Viajou para '+z.name, 'info');
   addLog('🗺️ Viajou para '+z.name, 'info');
-  updateUI(); renderMap(); renderMissions('solo');
+  updateUI(); renderMap();
+  // Refresh all mission tabs for the new zone
+  ['solo','clan','crime'].forEach(tab => renderMissions(tab));
+  forceSave();
 }
 
 
@@ -3463,8 +3470,21 @@ function getStamCost(m) {
 function renderMissions(tab='solo') {
   const panel = document.getElementById('mission-panel-'+tab);
   if (!panel) return;
-  const missions = MISSIONS.filter(m => m.type===tab);
-  if (!missions.length) { panel.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:20px;text-align:center">Nenhuma missão disponível.</div>'; return; }
+  // Filter by type AND current zone (except clan/crime which show all zones)
+  const showAllZones = (tab === 'clan' || tab === 'crime');
+  const missions = MISSIONS.filter(m => {
+    if (m.type !== tab) return false;
+    if (showAllZones) return true;
+    return m.zone === G.currentZone;
+  });
+  if (!missions.length) {
+    const zone = ZONES.find(z => z.id === G.currentZone);
+    panel.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:20px;text-align:center">'
+      + '🗺️ Nenhuma missão disponível em <b>' + (zone ? zone.name : G.currentZone) + '</b>.'
+      + '<br><small>Viaje para outro mapa ou suba de nível.</small>'
+      + '</div>';
+    return;
+  }
   const diffCls = {easy:'diff-easy',med:'diff-med',hard:'diff-hard',epic:'diff-epic'};
   const diffLabel = {easy:'Fácil',med:'Médio',hard:'Difícil',epic:'Épico'};
   panel.innerHTML = missions.map(m => {

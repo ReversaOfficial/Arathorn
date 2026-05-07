@@ -30,6 +30,19 @@ const ADMIN_USER = process.env.ADMIN_USER || 'arathorn';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'A1bc3@admin';
 const ADMIN_PANEL_SECRET = process.env.ADMIN_PANEL_SECRET || 'arathorn_panel_2024';
 
+// Admin token store (survives requests, resets on server restart)
+const _adminTokens = {};
+
+function verifyAdminToken(req) {
+  const auth = (req.headers['authorization'] || '');
+  const token = auth.replace('Bearer ', '').trim();
+  if (!token) return false;
+  const expiry = _adminTokens[token];
+  if (!expiry || Date.now() > expiry) { delete _adminTokens[token]; return false; }
+  return true;
+}
+
+
 // ONLINE TRACKING
 const onlineMap  = new Map(); // username -> { lastSeen, name, race, level, power, clanName }
 const sseClients = new Map(); // username -> res
@@ -2809,23 +2822,13 @@ async function handleRequest(req, res) {
     if (username === ADMIN_USER && password === ADMIN_PASS) {
       const token = crypto.createHmac('sha256', SECRET).update('admin:' + ADMIN_USER + ':' + Date.now()).digest('hex');
       // Store token temporarily (valid 8h)
-      if (!global._adminTokens) global._adminTokens = {};
-      global._adminTokens[token] = Date.now() + 8 * 60 * 60 * 1000;
+      _adminTokens[token] = Date.now() + 8 * 60 * 60 * 1000;
       send(res, 200, { ok: true, token }); return;
     }
     send(res, 401, { error: 'Credenciais inválidas.' }); return;
   }
 
-  // Admin auth middleware helper
-  function verifyAdminToken(req) {
-    const auth = req.headers['authorization'] || '';
-    const token = auth.replace('Bearer ', '').trim();
-    if (!token) return false;
-    if (!global._adminTokens) return false;
-    const expiry = global._adminTokens[token];
-    if (!expiry || Date.now() > expiry) { delete global._adminTokens[token]; return false; }
-    return true;
-  }
+  // verifyAdminToken is defined at module level
 
   // GET /api/admin/users — list all users with summary
   if (method === 'GET' && url === '/api/admin/users') {
