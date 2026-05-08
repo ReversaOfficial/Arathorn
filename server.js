@@ -3227,7 +3227,10 @@ async function handleRequest(req, res) {
     const user = db.users[username];
     if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
     const g = user.gameState;
-    if (!g.clanName) { send(res,400,{error:'Precisa de um cla.'}); return; }
+    // For raids (id 49-52): any player can create, no clan required
+    // For clan missions (id 42-48): must have a clan (leader check done client-side)
+    const isRaid = [49,50,51,52].includes(Number(missionId));
+    if (!isRaid && !g.clanName) { send(res,400,{error:'Missoes de cla requerem um cla.'}); return; }
     if (isRestricted(g)) { send(res,400,{error:'Voce esta preso ou na enfermaria.'}); return; }
     if (!db.groupRooms) db.groupRooms = {};
     // Clean expired rooms
@@ -3240,19 +3243,27 @@ async function handleRequest(req, res) {
     );
     if (existing) { send(res,400,{error:'Voce ja esta em uma sala. Cancele antes de criar outra.'}); return; }
     const roomId = 'grp_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    const isRaidMission = [49,50,51,52].includes(Number(missionId));
     db.groupRooms[roomId] = {
-      id: roomId, missionId, clanName: g.clanName,
+      id: roomId, missionId, clanName: isRaidMission ? null : g.clanName,
+      isRaid: isRaidMission,
       leader: username, leaderName: g.name,
       members: [{ username, name: g.name, race: g.race, level: g.level, power: calcPower(g) }],
       status: 'waiting',
       createdAt: Date.now(), expiresAt: Date.now() + 15*60*1000 // 15min to fill
     };
     saveDB(db);
-    // Notify online clanmates
+    // Raids: invite ALL online players; clan missions: invite only clanmates
     Object.entries(db.users).forEach(([u, d]) => {
-      if (u === username || !d.gameState || d.gameState.clanName !== g.clanName) return;
+      if (u === username || !d.gameState) return;
       if (!onlineMap.has(u)) return;
-      sendSSE(u, 'group_invite', { roomId, missionId, leaderName: g.name, clanName: g.clanName });
+      if (!isRaidMission && d.gameState.clanName !== g.clanName) return; // clan only
+      const lvReq = isRaidMission ? {49:30,50:150,51:400,52:800}[Number(missionId)]||30 : 0;
+      if (d.gameState.level < lvReq) return; // skip underleveled
+      sendSSE(u, 'group_invite', {
+        roomId, missionId, leaderName: g.name,
+        clanName: g.clanName, isRaid: isRaidMission
+      });
     });
     send(res,200,{ ok:true, roomId }); return;
   }
@@ -3270,7 +3281,10 @@ async function handleRequest(req, res) {
     const user = db.users[username];
     if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
     const g = user.gameState;
-    if (g.clanName !== room.clanName) { send(res,403,{error:'Voce nao pertence ao cla desta missao.'}); return; }
+    const isRaidRoom = [49,50,51,52].includes(Number(room.missionId));
+    if (!isRaidRoom && g.clanName !== room.clanName) {
+      send(res,403,{error:'Voce nao pertence ao cla desta missao.'}); return;
+    }
     if (isRestricted(g)) { send(res,400,{error:'Voce esta preso ou na enfermaria.'}); return; }
     if (room.members.find(m => m.username === username)) { send(res,409,{error:'Voce ja esta nesta sala.'}); return; }
     room.members.push({ username, name: g.name, race: g.race, level: g.level, power: calcPower(g) });
@@ -3320,7 +3334,14 @@ async function handleRequest(req, res) {
     const db = loadDB();
     const room = db.groupRooms && db.groupRooms[roomId];
     if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
-    if (room.leader !== username) { send(res,403,{error:'Apenas o lider pode iniciar.'}); return; }
+    const isRaidStart = room.isRaid || [49,50,51,52].includes(Number(room.missionId));
+    // Raids: anyone in the room can start; clan missions: only the room creator
+    if (!isRaidStart && room.leader !== username) {
+      send(res,403,{error:'Apenas o lider pode iniciar missoes de cla.'}); return;
+    }
+    if (!room.members.find(m => m.username === username)) {
+      send(res,403,{error:'Voce nao esta nesta sala.'}); return;
+    }
     if (room.status !== 'waiting') { send(res,400,{error:'Sala ja iniciada.'}); return; }
     // Find mission definition on server
     const CLAN_MISSIONS = {

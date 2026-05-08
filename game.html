@@ -8704,7 +8704,8 @@ async function openGroupLobby(missionId) {
   if (!m) return;
 
   const needed   = m.clanSize || 2;
-  const isLeader = (G.clanRole === 'leader');
+  const isRaid   = m.type === 'raid';
+  const isLeader = isRaid || G.clanRole === 'leader'; // raids: anyone can create
   const myPower  = G.level*100 + ((G.stats&&G.stats.kills)||0)*2 + (G.str||10)*8 + (G.res||10)*6 + (G.mag||8)*4;
 
   showModal(
@@ -8726,15 +8727,16 @@ async function openGroupLobby(missionId) {
     [
       { label:'Cancelar', fn: closeModal },
       ...(G.stam >= m.stam ? [{
-        label: isLeader ? '📢 Convocar clã' : '🚪 Entrar em sala existente',
+        label: isLeader
+          ? (isRaid ? '⚔ Convocar jogadores online' : '📢 Convocar clã')
+          : '🚪 Aguardar convite do líder',
         cls: 'btn-gold',
         fn: async () => {
           closeModal();
           if (isLeader) {
             await createGroupRoom(missionId);
           } else {
-            // Non-leaders see active rooms for this mission
-            await findAndJoinGroupRoom(missionId);
+            toast('Aguarde seu líder do clã convocar a missão!', 'info');
           }
         }
       }] : [])
@@ -8812,13 +8814,15 @@ function showGroupLobbyModal(roomId, m) {
           _groupRoom = null;
           toast('Saiu da sala.','info');
         }},
-        ...(isLeader && canStart ? [{
-          label: '⚔ INICIAR MISSÃO', cls:'btn-red',
+        ...((canStart && (room.isRaid || m.type === 'raid'
+          ? room.members.find(mb => mb.username === AUTH.username)  // raid: anyone
+          : room.leader === AUTH.username)                           // clan: leader only
+        ) ? [{
+          label: '⚔ INICIAR!', cls:'btn-red',
           fn: async () => {
             closeModal();
             const r2 = await api('POST', '/api/group/start', { roomId });
             if (r2.error) { toast(r2.error,'bad'); return; }
-            // Leader runs the combat
             startGroupCombat(roomId, m);
           }
         }] : [])
@@ -8855,7 +8859,7 @@ function registerGroupSSEHandlers() {
       + '<div style="font-size:36px;margin-bottom:8px">'+m.icon+'</div>'
       + '<div style="font-family:Cinzel,serif;font-size:14px;color:var(--gold);margin-bottom:6px">'+m.name+'</div>'
       + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">'
-      +   '<b>'+d.leaderName+'</b> está convocando seu clã!'
+      +   '<b>'+d.leaderName+'</b> está convocando '+(d.isRaid ? 'jogadores online' : 'seu clã')+'!'
       + '</div>'
       + '<div style="background:var(--bg-dark);border-radius:var(--radius);padding:10px;font-size:12px">'
       +   '👥 '+m.clanSize+' jogadores · ⚡ -'+m.stam+' estam · 💀 Falha = enfermaria'
