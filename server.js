@@ -1530,16 +1530,44 @@ async function handleRequest(req, res) {
     const username = verifyToken(getToken(req));
     if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
     const db = loadDB();
+    const user = db.users[username];
+    const g = user && user.gameState;
     if (!db.chatRooms) db.chatRooms = {};
+
+    // AUTO-SYNC: ensure clan member has their clan room and is in it
+    if (g && g.clanName) {
+      // Find existing clan room
+      let clanRoom = Object.values(db.chatRooms).find(r => r.type==='clan' && r.clanName===g.clanName);
+      if (!clanRoom) {
+        // Create it
+        const safeId = 'clan_' + g.clanName.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + Date.now();
+        clanRoom = { id: safeId, type:'clan', name:'🛡 Clã '+g.clanName,
+          clanName: g.clanName, members:[], messages:[], readAt:{}, createdAt:Date.now() };
+        db.chatRooms[clanRoom.id] = clanRoom;
+      }
+      // Sync all current members in/out
+      Object.entries(db.users).forEach(([u, d]) => {
+        if (d.gameState && d.gameState.clanName === g.clanName) {
+          if (!clanRoom.members.includes(u)) clanRoom.members.push(u);
+        }
+      });
+      clanRoom.members = clanRoom.members.filter(u => {
+        const d = db.users[u];
+        return d && d.gameState && d.gameState.clanName === g.clanName;
+      });
+      saveDB(db);
+    }
+
     const rooms = Object.values(db.chatRooms)
-      .filter(r => r.members.includes(username))
+      .filter(r => r.members && r.members.includes(username))
       .map(r => {
-        const last = r.messages.length ? r.messages[r.messages.length-1] : null;
+        const last = r.messages && r.messages.length ? r.messages[r.messages.length-1] : null;
         const unread = (r.messages||[]).filter(m => m.ts > ((r.readAt||{})[username]||0) && m.from !== username).length;
-        return { id: r.id, type: r.type, name: r.name, members: r.members, unread, lastMsg: last ? {text: last.text.slice(0,40), from: last.fromName, ts: last.ts} : null };
-      }).sort((a,b) => (b.lastMsg?.ts||0)-(a.lastMsg?.ts||0));
-    send(res, 200, { rooms });
-    return;
+        return { id: r.id, type: r.type, name: r.name, clanName: r.clanName||null,
+          members: r.members, unread,
+          lastMsg: last ? { text: last.text.slice(0,40), from: last.fromName, ts: last.ts } : null };
+      }).sort((a,b) => (b.lastMsg&&b.lastMsg.ts||0)-(a.lastMsg&&a.lastMsg.ts||0));
+    send(res, 200, { rooms }); return;
   }
 
   if (method === 'POST' && url === '/api/chat/room/create') {
@@ -1614,7 +1642,17 @@ async function handleRequest(req, res) {
     const db = loadDB();
     if (!db.chatRooms||!db.chatRooms[roomId]) { send(res,404,{error:'Sala nao encontrada.'}); return; }
     const room = db.chatRooms[roomId];
-    if (!room.members.includes(username)) { send(res,403,{error:'Voce nao e membro desta sala.'}); return; }
+    // For clan rooms: check actual clan membership, not just member list
+    if (room.type === 'clan') {
+      const rg = db.users[username] && db.users[username].gameState;
+      if (!rg || rg.clanName !== room.clanName) {
+        send(res,403,{error:'Voce nao pertence a este cla.'}); return;
+      }
+      // Ensure user is in members list
+      if (!room.members.includes(username)) room.members.push(username);
+    } else if (!room.members.includes(username)) {
+      send(res,403,{error:'Voce nao e membro desta sala.'}); return;
+    }
     // Mark read
     if (!room.readAt) room.readAt = {};
     room.readAt[username] = Date.now();
@@ -1632,10 +1670,23 @@ async function handleRequest(req, res) {
     if (!db.chatRooms||!db.chatRooms[roomId]) { send(res,404,{error:'Sala nao encontrada.'}); return; }
     const room = db.chatRooms[roomId];
     if (!room.members.includes(username)) { send(res,403,{error:'Nao e membro.'}); return; }
-    // Auto-sync clan room members
+    // Clan room: validate sender is still a member of the clan
     if (room.type==='clan') {
-      const allUsers = Object.values(db.users).filter(u=>u.gameState&&u.gameState.clanName===room.clanName);
-      allUsers.forEach(u=>{ if(!room.members.includes(u.username)) room.members.push(u.username); });
+      const senderG = db.users[username] && db.users[username].gameState;
+      if (!senderG || senderG.clanName !== room.clanName) {
+        send(res,403,{error:'Voce nao pertence a este cla.'}); return;
+      }
+      // Sync all current clan members
+      Object.entries(db.users).forEach(([u, d]) => {
+        if (d.gameState && d.gameState.clanName === room.clanName) {
+          if (!room.members.includes(u)) room.members.push(u);
+        }
+      });
+      // Remove ex-members
+      room.members = room.members.filter(u => {
+        const d = db.users[u];
+        return d && d.gameState && d.gameState.clanName === room.clanName;
+      });
     }
     const g = db.users[username].gameState;
     const msg = { id: crypto.randomBytes(4).toString('hex'), from: username, fromName: g.name, fromRace: g.race, text: text.trim().slice(0,500), ts: Date.now() };

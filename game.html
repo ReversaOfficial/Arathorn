@@ -7028,6 +7028,8 @@ async function joinClanChat() {
   if (!G.clanName) { toast('Você não possui um clã!','bad'); return; }
   const res = await api('POST', '/api/chat/room/create', { type:'clan' });
   if (res.error) { toast(res.error,'bad'); return; }
+  // Reload chat rooms to include the new clan room
+  await loadChatRooms();
   await loadChatRooms();
   openRoom(res.room.id);
   const chatNav = document.querySelector('[data-page="chat"]');
