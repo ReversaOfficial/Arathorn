@@ -3549,14 +3549,17 @@ function renderMissions(tab='solo') {
           <div class="mission-meta">
             <span style="${stamColor}">⚡ ${cost} estamina${zeroStam?' ⚠️':''}</span>
             <span class="${diffCls[m.diff]}">${diffLabel[m.diff]}</span>
-            ${m.clanSize?`<span>👥 ${m.clanSize}+</span>`:''}
+            ${m.clanSize?`<span style="color:var(--gold)">👥 ${m.clanSize} jogadores</span>`:''}
             ${m.jail?`<span style="color:var(--red-light)">⚠ Risco prisão</span>`:''}
           </div>
           <div class="mission-reward">🏆 +${m.gold[0]}–${m.gold[1]} 🪙 | +${m.xp[0]}–${m.xp[1]} XP</div>
         </div>
         ${warning?`<div>${warning}</div>`:''}
       </div>
-      <button class="btn btn-gold btn-sm" onclick="startMission(${m.id})" ${disabled?'disabled':''}>${m.type==='crime'?'Cometer Crime':'Iniciar Missão'}</button>
+      ${(m.type==='clan'||m.type==='raid')
+        ? `<button class="btn btn-gold btn-sm" onclick="openGroupLobby(${m.id})" ${disabled?'disabled':''}>👥 Convocar Grupo</button>`
+        : `<button class="btn btn-gold btn-sm" onclick="startMission(${m.id})" ${disabled?'disabled':''}>${m.type==='crime'?'Cometer Crime':'Iniciar Missão'}</button>`
+      }
     </div>`;
   }).join('');
 }
@@ -4560,6 +4563,12 @@ function finalizeCombat(won, m, enemyName, finalHp, clog) {
   }
 
   randomizeCloseButton();
+  // Group mission callback — reports result to server
+  if (typeof _groupCombatCallback === 'function') {
+    const _won = (document.getElementById('combat-result').style.color || '').includes('green');
+    _groupCombatCallback(_won);
+    _groupCombatCallback = null;
+  }
   updateUI();
   forceSave();
 }
@@ -5022,6 +5031,7 @@ function initGame() {
   setTimeout(registerAssassinSSEHandlers, 1600);
   setTimeout(registerRaidSSEHandlers, 1600);
   setTimeout(registerClanMissionSSEHandler, 1700);
+  setTimeout(registerGroupSSEHandlers, 1800);
   setTimeout(loadPartyState, 1500);
   setTimeout(loadServerAssassin, 2000);
   if (!G.friends) G.friends = [];
@@ -8675,6 +8685,235 @@ function registerRaidSSEHandlers() {
     api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState; updateUI();} });
     const badge = document.getElementById('raid-badge');
     if (badge) badge.style.display = 'none';
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════
+// GROUP MISSION LOBBY — clan missions + raids
+// ══════════════════════════════════════════════════════════
+
+let _groupRoom = null;  // active group room state
+let _groupCombatCallback = null; // callback after group combat
+
+async function openGroupLobby(missionId) {
+  if (isRestricted()) return;
+  if (!G.clanName) { toast('Você precisa de um clã!','bad'); return; }
+
+  const m = MISSIONS.find(x => x.id === missionId);
+  if (!m) return;
+
+  const needed   = m.clanSize || 2;
+  const isLeader = (G.clanRole === 'leader');
+  const myPower  = G.level*100 + ((G.stats&&G.stats.kills)||0)*2 + (G.str||10)*8 + (G.res||10)*6 + (G.mag||8)*4;
+
+  showModal(
+    m.icon + ' ' + m.name,
+    '<div style="text-align:center">'
+    + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">'+m.desc+'</div>'
+    + '<div style="background:var(--bg-dark);border-radius:var(--radius);padding:12px;margin-bottom:12px;font-size:12px">'
+    +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +   '<div>👥 <b>'+needed+' jogadores</b> necessários</div>'
+    +   '<div>⚡ <b>-'+m.stam+'</b> estamina cada</div>'
+    +   '<div>💰 <b>'+m.gold[0].toLocaleString()+'–'+m.gold[1].toLocaleString()+'</b> ouro</div>'
+    +   '<div>✨ <b>'+m.xp[0].toLocaleString()+'–'+m.xp[1].toLocaleString()+'</b> XP</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Seu poder: <b style="color:var(--gold)">⚡ '+myPower.toLocaleString()+'</b></div>'
+    + (G.stam < m.stam ? '<div style="color:var(--red-light);font-size:12px">⚡ Estamina insuficiente! ('+G.stam+'/'+m.stam+')</div>' : '')
+    + '<div style="font-size:12px;color:var(--text-muted);margin-top:8px">💀 Se a missão falhar, <b>todos</b> vão para a enfermaria!</div>'
+    + '</div>',
+    [
+      { label:'Cancelar', fn: closeModal },
+      ...(G.stam >= m.stam ? [{
+        label: isLeader ? '📢 Convocar clã' : '🚪 Entrar em sala existente',
+        cls: 'btn-gold',
+        fn: async () => {
+          closeModal();
+          if (isLeader) {
+            await createGroupRoom(missionId);
+          } else {
+            // Non-leaders see active rooms for this mission
+            await findAndJoinGroupRoom(missionId);
+          }
+        }
+      }] : [])
+    ]
+  );
+}
+
+async function createGroupRoom(missionId) {
+  const m = MISSIONS.find(x => x.id === missionId);
+  const res = await api('POST', '/api/group/create', { missionId });
+  if (res.error) { toast(res.error,'bad'); return; }
+  _groupRoom = { id: res.roomId, missionId };
+  toast('📢 Sala criada! Membros do clã foram convidados.', 'good');
+  showGroupLobbyModal(res.roomId, m);
+}
+
+async function findAndJoinGroupRoom(missionId) {
+  // For non-leaders: show a notice that leader must create the room
+  toast('Aguarde seu líder convocar a missão!','info');
+}
+
+async function joinGroupFromInvite(roomId, missionId) {
+  const res = await api('POST', '/api/group/join', { roomId });
+  if (res.error) { toast(res.error,'bad'); return; }
+  _groupRoom = { id: roomId, missionId };
+  const m = MISSIONS.find(x => x.id === missionId);
+  toast('✅ Você entrou na sala!','good');
+  showGroupLobbyModal(roomId, m);
+}
+
+function showGroupLobbyModal(roomId, m) {
+  if (!m) return;
+  const needed = m.clanSize || 2;
+
+  // Fetch room state
+  api('GET', '/api/group/room/'+roomId).then(res => {
+    if (res.error || !res.room) { toast(res.error||'Sala não encontrada','bad'); return; }
+    const room = res.room;
+    const isLeader = room.leader === AUTH.username;
+    const count    = room.members.length;
+    const canStart = count >= needed;
+    const RICONS   = {elfo:'🧝',orc:'👹',anao:'⛏️',humano:'🧑‍⚔️',druida:'🌿',mago:'🧙'};
+
+    const membersHtml = room.members.map(m2 =>
+      '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+      + '<span style="font-size:16px">'+(RICONS[m2.race]||'👤')+'</span>'
+      + '<div style="flex:1"><div style="font-size:13px">'+m2.name
+      +   (m2.username===AUTH.username?' <span style="font-size:10px;color:var(--text-muted)">(Você)</span>':'')
+      +   (m2.username===room.leader?' 👑':'')+'</div>'
+      + '<div style="font-size:11px;color:var(--text-muted)">Nv.'+m2.level+' · ⚡'+m2.power.toLocaleString()+'</div></div>'
+      + '<span style="color:var(--green-light);font-size:12px">✓</span>'
+      + '</div>'
+    ).join('');
+
+    // Empty slots
+    const emptySlots = Array(Math.max(0, needed - count)).fill(0).map(() =>
+      '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);opacity:.4">'
+      + '<span style="font-size:16px">👤</span>'
+      + '<div style="flex:1;font-size:12px;color:var(--text-muted)">Aguardando...</div>'
+      + '</div>'
+    ).join('');
+
+    showModal(
+      m.icon + ' ' + m.name + ' — Sala',
+      '<div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;text-align:center">'
+      +   count+'/'+needed+' membros'+(canStart?' — <span style="color:var(--green-light)">Pronto!</span>':' — Aguardando...')
+      + '</div>'
+      + membersHtml + emptySlots
+      + '</div>',
+      [
+        { label:'Sair da Sala', fn: async () => {
+          closeModal();
+          await api('POST', '/api/group/leave', { roomId });
+          _groupRoom = null;
+          toast('Saiu da sala.','info');
+        }},
+        ...(isLeader && canStart ? [{
+          label: '⚔ INICIAR MISSÃO', cls:'btn-red',
+          fn: async () => {
+            closeModal();
+            const r2 = await api('POST', '/api/group/start', { roomId });
+            if (r2.error) { toast(r2.error,'bad'); return; }
+            // Leader runs the combat
+            startGroupCombat(roomId, m);
+          }
+        }] : [])
+      ],
+      true // keep open
+    );
+  });
+}
+
+async function startGroupCombat(roomId, m) {
+  // Set global callback — fires after combat closes
+  _groupCombatCallback = async (won) => {
+    const res = await api('POST', '/api/group/complete', { roomId, won });
+    _groupRoom = null;
+    if (res.error) toast(res.error,'bad');
+  };
+  const enemy = m.enemies[Math.floor(Math.random()*m.enemies.length)];
+  openCombat(m, enemy);
+}
+
+function registerGroupSSEHandlers() {
+  if (!sseConn) return;
+
+  // Invited to join a group
+  sseConn.addEventListener('group_invite', e => {
+    const d = JSON.parse(e.data);
+    const m = MISSIONS.find(x => x.id == d.missionId);
+    if (!m) return;
+    const badge = document.getElementById('missions-badge');
+    if (badge) { badge.style.display=''; badge.textContent='!'; }
+    showModal(
+      '📢 Convocação de Missão!',
+      '<div style="text-align:center">'
+      + '<div style="font-size:36px;margin-bottom:8px">'+m.icon+'</div>'
+      + '<div style="font-family:Cinzel,serif;font-size:14px;color:var(--gold);margin-bottom:6px">'+m.name+'</div>'
+      + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">'
+      +   '<b>'+d.leaderName+'</b> está convocando seu clã!'
+      + '</div>'
+      + '<div style="background:var(--bg-dark);border-radius:var(--radius);padding:10px;font-size:12px">'
+      +   '👥 '+m.clanSize+' jogadores · ⚡ -'+m.stam+' estam · 💀 Falha = enfermaria'
+      + '</div></div>',
+      [
+        { label:'✕ Recusar', fn: closeModal },
+        { label:'⚔ Entrar!', cls:'btn-gold', fn: async () => {
+          closeModal();
+          await joinGroupFromInvite(d.roomId, d.missionId);
+        }}
+      ]
+    );
+  });
+
+  // Room updated (someone joined)
+  sseConn.addEventListener('group_update', e => {
+    const d = JSON.parse(e.data);
+    if (_groupRoom && _groupRoom.id === d.room.id) {
+      const m = MISSIONS.find(x => x.id == d.room.missionId);
+      if (m) showGroupLobbyModal(d.room.id, m);
+    }
+    const who = d.room.members[d.room.members.length-1];
+    if (who && who.username !== AUTH.username) toast('👤 '+who.name+' entrou na sala!','info');
+  });
+
+  // Mission started (non-leader members)
+  sseConn.addEventListener('group_started', e => {
+    const d = JSON.parse(e.data);
+    const m = MISSIONS.find(x => x.id == d.missionId);
+    if (!m || !_groupRoom) return;
+    const enemy = m.enemies[Math.floor(Math.random()*m.enemies.length)];
+    // Non-leaders run combat visually — server result comes via group_complete SSE
+    openCombat(m, enemy);
+  });
+
+  // Room cancelled
+  sseConn.addEventListener('group_cancelled', e => {
+    _groupRoom = null;
+    closeModal();
+    toast('Sala de missão cancelada pelo líder.','info');
+  });
+
+  // Mission complete result
+  sseConn.addEventListener('group_complete', e => {
+    const d = JSON.parse(e.data);
+    if (d.won) {
+      toast('🏆 Missão de grupo concluída! +'+d.gold.toLocaleString()+' ouro +'+d.xp.toLocaleString()+' XP','good');
+      addLog('🏆 Missão de grupo: +'+d.gold+' ouro +'+d.xp+' XP','good');
+    } else {
+      toast('💀 Missão falhou! Todos vão para a enfermaria por 10 minutos.','bad');
+      addLog('💀 Missão de grupo falhou — enfermaria 10min.','bad');
+      if (d.knockedOut) {
+        G.knockedOutUntil = Date.now() + 10*60*1000;
+        G.hp = 0;
+      }
+    }
+    _groupRoom = null;
+    api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState; updateUI(); updateInfirmaryBanner();} });
   });
 }
 
