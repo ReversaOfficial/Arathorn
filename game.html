@@ -3785,7 +3785,12 @@ function buildInvItemCard(invId, mode) {
         + '<span class="badge badge-gold">Equipado</span>'
         + '<button class="btn btn-sm btn-red" data-inv="'+invId+'" onclick="unequipItemByData(this)" title="Desequipar" style="font-size:11px;padding:3px 8px">↩ Desequipar</button>'
         + '</div>'
-      : '<button class="btn btn-gold btn-sm" data-inv="'+invId+'" onclick="equipItemByData(this)">Equipar</button>';
+      : (() => {
+          // Check if same base item is equipped somewhere else (duplicate block)
+          const isDupe = Object.values(G.equipment||{}).some(eId => eId && basePureId(eId) === basePureId(invId));
+          if (isDupe) return '<button class="btn btn-sm" disabled style="opacity:.5;cursor:not-allowed;font-size:11px" title="Já equipado em outro slot">🚫 Duplicado</button>';
+          return '<button class="btn btn-gold btn-sm" data-inv="'+invId+'" onclick="equipItemByData(this)">Equipar</button>';
+        })();
   } else if (mode === 'sell') {
     const sellPrice = calcSellPriceClient(invId);
     const canSell = !equipped;
@@ -4217,29 +4222,45 @@ function unequipItem(invId) {
 }
 
 function equipItem(id) {
+  if (isRestricted()) return;
   const it = findItem(id);
   if (!it) return;
 
-  // ── BUG FIX: prevent equipping same base item twice ──────────────────
-  // Each slot can only have 1 item. But also: same BASE item (same id,
-  // different refine) cannot be in two slots simultaneously.
   const baseId = basePureId(id);
 
-  // Check if ANY slot already has this same base item (different refine)
-  let alreadyEquippedSlot = null;
-  Object.entries(G.equipment || {}).forEach(([slot, eId]) => {
-    if (eId && basePureId(eId) === baseId && slot !== it.slot) {
-      alreadyEquippedSlot = slot;
+  // ── RULE 1: Same base item cannot be in ANY other slot simultaneously ─
+  for (const [slot, eId] of Object.entries(G.equipment || {})) {
+    if (!eId) continue;
+    if (basePureId(eId) === baseId && slot !== it.slot) {
+      toast('⚠️ Você já tem "' + it.name + '" equipado em outro slot!', 'bad');
+      return;
     }
-  });
-  if (alreadyEquippedSlot) {
-    toast('⚠️ Você já tem este item equipado em outro slot!', 'bad');
+  }
+
+  // ── RULE 2: Same NAME item cannot be equipped in the same slot ────────
+  // (covers different +refine versions of same item — just replaces silently)
+  // But if trying to equip the EXACT same id already equipped → block
+  if (G.equipment[it.slot] && G.equipment[it.slot] === id) {
+    toast('⚠️ "' + it.name + '" já está equipado neste slot!', 'bad');
     return;
   }
 
-  // Also check: block equipping same item NAME in same slot type if it's a
-  // duplicate in inventory (same base id = same item, just different refine level)
-  // This is fine to allow — you're just upgrading the equipped piece
+  // ── RULE 3: Cannot equip an item that's already equipped elsewhere ────
+  // (same exact inventory id used in two slots)
+  for (const [slot, eId] of Object.entries(G.equipment || {})) {
+    if (eId === id && slot !== it.slot) {
+      toast('⚠️ Este item já está equipado!', 'bad');
+      return;
+    }
+  }
+
+  // ── If slot already occupied, unequip old first (silent swap) ─────────
+  const previous = G.equipment[it.slot];
+  if (previous) {
+    const prevItem = findItem(previous);
+    // Revert previous item HP/stam bonuses (handled by getEffectiveStats, but stam needs capping)
+  }
+
   G.equipment[it.slot] = id;
   addLog('⚔ Equipou: ' + it.name + (getRefineLevel(baseInvId(id)) > 0 ? ' [+'+getRefineLevel(baseInvId(id))+']' : ''), 'good');
   toast('✅ ' + it.name + ' equipado!', 'good');
