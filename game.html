@@ -744,6 +744,11 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 .raid-cd-bar{height:4px;background:rgba(0,0,0,.3);border-radius:2px;margin-top:4px;overflow:hidden}
 .raid-cd-fill{height:100%;background:var(--red);border-radius:2px;transition:width 1s linear}
 
+/* ── INVENTORY FILTERS ── */
+.inv-filter-btn{padding:4px 10px;font-size:11px;background:var(--bg-dark);border:1px solid var(--border);border-radius:20px;color:var(--text-muted);cursor:pointer;transition:.15s;white-space:nowrap}
+.inv-filter-btn:hover{border-color:var(--border-light);color:var(--text-secondary)}
+.inv-filter-btn.active{background:rgba(201,168,76,.15);border-color:var(--gold);color:var(--gold);font-weight:600}
+
 </style>
 </head>
 <body>
@@ -1214,12 +1219,27 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
         </div>
         <!-- equip tab -->
         <div id="inv-tab-equip">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:8px 10px;background:var(--bg-dark);border-radius:var(--radius);border:1px solid var(--border)">
-            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:var(--text-secondary);user-select:none">
-              <input type="checkbox" id="hide-equipped-toggle" onchange="renderInventory('equip')" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer">
-              Esconder itens equipados
-            </label>
-            <span style="margin-left:auto;font-size:11px;color:var(--text-muted)" id="inv-count-label"></span>
+          <!-- Filter bar -->
+          <div style="margin-bottom:8px">
+            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px" id="inv-slot-filters">
+              <button class="inv-filter-btn active" data-slot="all"     onclick="setInvFilter(this)">🎒 Todos</button>
+              <button class="inv-filter-btn"        data-slot="weapon"  onclick="setInvFilter(this)">⚔ Armas</button>
+              <button class="inv-filter-btn"        data-slot="helmet"  onclick="setInvFilter(this)">🪖 Elmos</button>
+              <button class="inv-filter-btn"        data-slot="armor"   onclick="setInvFilter(this)">🧥 Armaduras</button>
+              <button class="inv-filter-btn"        data-slot="pants"   onclick="setInvFilter(this)">👖 Calças</button>
+              <button class="inv-filter-btn"        data-slot="gloves"  onclick="setInvFilter(this)">🧤 Luvas</button>
+              <button class="inv-filter-btn"        data-slot="boots"   onclick="setInvFilter(this)">👢 Botas</button>
+              <button class="inv-filter-btn"        data-slot="shield"  onclick="setInvFilter(this)">🛡 Escudos</button>
+              <button class="inv-filter-btn"        data-slot="ring"    onclick="setInvFilter(this)">💍 Anéis</button>
+              <button class="inv-filter-btn"        data-slot="earring" onclick="setInvFilter(this)">📿 Brincos</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg-dark);border-radius:var(--radius);border:1px solid var(--border)">
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none">
+                <input type="checkbox" id="hide-equipped-toggle" onchange="renderInventory('equip')" style="width:14px;height:14px;accent-color:var(--gold);cursor:pointer">
+                Esconder equipados
+              </label>
+              <span style="margin-left:auto;font-size:11px;color:var(--text-muted)" id="inv-count-label"></span>
+            </div>
           </div>
           <div class="card" style="margin-bottom:0"><div id="inv-grid" class="grid-3"></div></div>
         </div>
@@ -3813,14 +3833,28 @@ function renderInventory(mode) {
 
   // EQUIP tab
   if (mode === 'equip') {
-    const grid = document.getElementById('inv-grid');
-    const hideEquipped = document.getElementById('hide-equipped-toggle')?.checked || false;
+    const grid       = document.getElementById('inv-grid');
+    const hideEq     = document.getElementById('hide-equipped-toggle')?.checked || false;
     const countLabel = document.getElementById('inv-count-label');
-    const filtered = hideEquipped
+    // Active slot filter
+    const activeBtn  = document.querySelector('.inv-filter-btn.active');
+    const slotFilter = activeBtn ? activeBtn.dataset.slot : 'all';
+    let filtered = hideEq
       ? inv.filter(id => !Object.values(G.equipment||{}).includes(id))
       : inv;
+    // Apply slot filter
+    if (slotFilter !== 'all') {
+      filtered = filtered.filter(id => {
+        const it = findItem(id);
+        return it && it.slot === slotFilter;
+      });
+    }
     if (countLabel) countLabel.textContent = filtered.length + '/' + inv.length + ' itens';
-    if (grid) grid.innerHTML = filtered.length ? filtered.map(id => buildInvItemCard(id, 'equip')).join('') : (hideEquipped ? '<div style="color:var(--text-muted);font-size:13px;font-style:italic;padding:16px;text-align:center;grid-column:1/-1">Todos os itens estão equipados.</div>' : empty);
+    if (grid) grid.innerHTML = filtered.length
+      ? filtered.map(id => buildInvItemCard(id, 'equip')).join('')
+      : '<div style="color:var(--text-muted);font-size:13px;font-style:italic;padding:20px;text-align:center;grid-column:1/-1">'
+        + (slotFilter !== 'all' ? 'Nenhum item deste tipo no inventário.' : hideEq ? 'Todos os itens estão equipados.' : 'Sem itens no inventário.')
+        + '</div>';
   }
   // CONSUM tab
   if (mode === 'consum') {
@@ -3851,6 +3885,14 @@ function renderInventory(mode) {
   if (mode === 'trade') {
     renderTradeTab();
   }
+}
+
+
+function setInvFilter(btn) {
+  // Toggle active state
+  document.querySelectorAll('.inv-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderInventory('equip');
 }
 
 function useConsumableByData(btn) { useConsumable(btn.dataset.id); }
