@@ -1186,7 +1186,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
               <div class="card-title">Equipamento</div>
               <div class="equip-grid" style="grid-template-columns:repeat(3,1fr)">
                 <div class="equip-slot" id="esl-weapon"><div class="equip-slot-label">Arma</div><div class="equip-slot-icon" id="esl-weapon-icon">✊</div><div class="equip-slot-name" id="esl-weapon-name">—</div></div>
-                <div class="equip-slot" id="esl-helmet"><div class="equip-slot-label">Elmo</div><div class="equip-slot-icon" id="esl-helmet-icon">🪖</div><div class="equip-slot-name" id="esl-helmet-name">—</div></div>
+                <div class="equip-slot" id="esl-helmet"><div class="equip-slot-label">Elmo</div><div class="equip-slot-icon" id="esl-helmet-icon">⛑️</div><div class="equip-slot-name" id="esl-helmet-name">—</div></div>
                 <div class="equip-slot" id="esl-armor"><div class="equip-slot-label">Armadura</div><div class="equip-slot-icon" id="esl-armor-icon">👕</div><div class="equip-slot-name" id="esl-armor-name">—</div></div>
                 <div class="equip-slot" id="esl-pants"><div class="equip-slot-label">Calças</div><div class="equip-slot-icon" id="esl-pants-icon">👖</div><div class="equip-slot-name" id="esl-pants-name">—</div></div>
                 <div class="equip-slot" id="esl-gloves"><div class="equip-slot-label">Luvas</div><div class="equip-slot-icon" id="esl-gloves-icon">🧤</div><div class="equip-slot-name" id="esl-gloves-name">—</div></div>
@@ -1224,7 +1224,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
             <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px" id="inv-slot-filters">
               <button class="inv-filter-btn active" data-slot="all"     onclick="setInvFilter(this)">🎒 Todos</button>
               <button class="inv-filter-btn"        data-slot="weapon"  onclick="setInvFilter(this)">⚔ Armas</button>
-              <button class="inv-filter-btn"        data-slot="helmet"  onclick="setInvFilter(this)">🪖 Elmos</button>
+              <button class="inv-filter-btn"        data-slot="helmet"  onclick="setInvFilter(this)">⛑️ Elmos</button>
               <button class="inv-filter-btn"        data-slot="armor"   onclick="setInvFilter(this)">🧥 Armaduras</button>
               <button class="inv-filter-btn"        data-slot="pants"   onclick="setInvFilter(this)">👖 Calças</button>
               <button class="inv-filter-btn"        data-slot="gloves"  onclick="setInvFilter(this)">🧤 Luvas</button>
@@ -2625,6 +2625,13 @@ const SHOP_ITEMS = {
 
  // ── RINGS ─────────────────────────────────────────────────────────────────
  rings:[
+  // ── ANÉIS DE ESTAMINA — para todas as classes (class:null) ──────────────
+  {id:'rs1',icon:'🟢',name:'Anel de Vitalidade',     slot:'ring',class:null,stam:10,price:500,   minLv:5,  grade:'normal',   desc:'ESTAM +10'},
+  {id:'rs2',icon:'🔵',name:'Anel da Resistência',    slot:'ring',class:null,stam:20,price:2500,  minLv:20, grade:'excellent', desc:'ESTAM +20'},
+  {id:'rs3',icon:'🟣',name:'Anel da Perseverança',   slot:'ring',class:null,stam:30,price:10000, minLv:40, grade:'superrare', desc:'ESTAM +30'},
+  {id:'rs4',icon:'💜',name:'Anel do Titã',           slot:'ring',class:null,stam:40,price:50000, minLv:80, grade:'epic',      desc:'ESTAM +40'},
+  {id:'rs5',icon:'✨',name:'Anel da Eternidade',     slot:'ring',class:null,stam:50,price:250000,minLv:150,grade:'legendary',  desc:'ESTAM +50'},
+  // ── por classe ───────────────────────────────────────────────────────────
   {id:'re1',icon:'💍',name:'Anel de Esmeralda',     slot:'ring',class:'elfo', dex:10,mag:10,price:200, minLv:4, grade:'normal',   desc:'DEX +10 MAG +10'},
   {id:'re2',icon:'💍',name:'Anel da Lua',            slot:'ring',class:'elfo', dex:20,mag:20,price:1000,minLv:14,grade:'excellent', desc:'DEX +20 MAG +20'},
   {id:'re3',icon:'💎',name:'Anel das Estrelas',      slot:'ring',class:'elfo', dex:30,mag:30,price:4000,minLv:28,grade:'superrare',desc:'DEX +30 MAG +30'},
@@ -2672,6 +2679,14 @@ const SHOP_ITEMS = {
    str:0,dex:0,mag:0,res:0, desc:'+10% ouro em todas as missões', goldBonus:0.10, special:'goldBonus'},
 
   // Colar da Resistência: +10 estamina máx (todos os personagens, slot: earring)
+  // ── ANÉIS DE ESTAMINA — para todos os personagens (class:null) ──────────
+  // Quanto mais raro, mais estamina concede. Permite prolongar batalhas.
+  {id:'rs1',icon:'🟢',name:'Anel de Vitalidade',     slot:'ring',class:null,stam:10,price:500,   minLv:5,  grade:'normal',   desc:'ESTAM +10 — Resistência básica'},
+  {id:'rs2',icon:'🔵',name:'Anel da Resistência',    slot:'ring',class:null,stam:20,price:2500,  minLv:20, grade:'excellent', desc:'ESTAM +20 — Para guerreiros experientes'},
+  {id:'rs3',icon:'🟣',name:'Anel da Perseverança',   slot:'ring',class:null,stam:30,price:10000, minLv:40, grade:'superrare', desc:'ESTAM +30 — Raro e poderoso'},
+  {id:'rs4',icon:'💜',name:'Anel do Titã',           slot:'ring',class:null,stam:40,price:50000, minLv:80, grade:'epic',      desc:'ESTAM +40 — Lendário, poucos o possuem'},
+  {id:'rs5',icon:'✨',name:'Anel da Eternidade',     slot:'ring',class:null,stam:50,price:250000,minLv:150,grade:'legendary',  desc:'ESTAM +50 — O pináculo da resistência'},
+
   {id:'neck_endurance', icon:'💚', name:'Colar da Resistência', slot:'earring', class:null, price:8000,  minLv:20, grade:'epic',
    str:0,dex:0,mag:0,res:0, desc:'+10 Estamina Máxima permanente enquanto equipado', stamBonus:10, special:'stamBonus'},
  ],
@@ -2737,7 +2752,7 @@ function refineColor(level) {
 
 // ── SET PIECE BUILDER ─────────────────────────────────────────────────────────
 // Build set pieces from SETS definition at startup
-const SET_PIECE_ICON = { helmet:'🪖', armor:'🧥', pants:'👖', gloves:'🧤', boots:'👢' };
+const SET_PIECE_ICON = { helmet:'⛑️', armor:'🧥', pants:'👖', gloves:'🧤', boots:'👢' };
 const SET_SLOT_NAMES = { helmet:'Elmo', armor:'Armadura', pants:'Calças', gloves:'Luvas', boots:'Botas' };
 
 function buildSetPieces() {
@@ -3260,7 +3275,7 @@ function updateUI() {
 
 function updateEquipSlots() {
   const defs = {
-    weapon:{icon:'✊',name:'Arma'},helmet:{icon:'🪖',name:'Elmo'},armor:{icon:'👕',name:'Armadura'},
+    weapon:{icon:'✊',name:'Arma'},helmet:{icon:'⛑️',name:'Elmo'},armor:{icon:'👕',name:'Armadura'},
     pants:{icon:'👖',name:'Calças'},gloves:{icon:'🧤',name:'Luvas'},boots:{icon:'👢',name:'Botas'},
     shield:{icon:'🛡️',name:'Escudo'},ring:{icon:'💍',name:'Anel'},earring:{icon:'📿',name:'Brinco'}
   };
