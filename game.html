@@ -749,6 +749,13 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
 .inv-filter-btn:hover{border-color:var(--border-light);color:var(--text-secondary)}
 .inv-filter-btn.active{background:rgba(201,168,76,.15);border-color:var(--gold);color:var(--gold);font-weight:600}
 
+/* ── SELL MULTI-SELECT ── */
+.sell-item-selectable{cursor:pointer;transition:border-color .15s,background .15s;user-select:none}
+.sell-item-selectable:hover{border-color:var(--gold-dark)!important}
+.sell-item-selectable.sell-selected{border-color:var(--gold)!important;background:rgba(201,168,76,.12)!important}
+.sell-item-selectable.sell-selected::after{content:'✓';position:absolute;top:4px;right:6px;color:var(--gold);font-weight:700;font-size:14px}
+.sell-item-selectable{position:relative}
+
 </style>
 </head>
 <body>
@@ -1249,11 +1256,18 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
         </div>
         <!-- sell tab -->
         <div id="inv-tab-sell" style="display:none">
-          <div class="card" style="margin-bottom:10px">
-            <div class="card-title">💰 Vender Itens para a Loja</div>
-            <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">
-              O ferreiro compra itens por <b style="color:var(--gold)">15–25% do valor original</b>. Itens refinados e com Sorte valem mais.<br>
-              <span style="color:var(--red-light)">Itens equipados não podem ser vendidos — desequipe primeiro.</span>
+          <!-- Sell toolbar -->
+          <div style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 14px;margin-bottom:10px">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+              O ferreiro compra por <b style="color:var(--gold)">15–25% do valor</b>. Refinados e Sortudos valem mais.
+              <span style="color:var(--red-light)"> · Equipados não podem ser vendidos.</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" id="sell-select-all" onclick="sellSelectAll()" style="font-size:11px">☑ Selecionar todos</button>
+              <button class="btn btn-sm" id="sell-deselect-all" onclick="sellDeselectAll()" style="font-size:11px">☐ Desmarcar todos</button>
+              <div style="flex:1"></div>
+              <div id="sell-summary" style="font-size:12px;color:var(--text-muted)">Nenhum selecionado</div>
+              <button class="btn btn-green" id="sell-all-btn" onclick="sellSelected()" disabled style="font-size:12px;padding:7px 16px;font-weight:700">💰 Vender Selecionados</button>
             </div>
           </div>
           <div id="sell-grid" class="grid-3"></div>
@@ -3809,10 +3823,13 @@ function buildInvItemCard(invId, mode) {
   } else if (mode === 'sell') {
     const sellPrice = calcSellPriceClient(invId);
     const canSell = !equipped;
-    actions = '<div class="sell-price-tag">💰 Venda: ⬡ '+sellPrice.toLocaleString()+'</div>'
-      + (canSell
-        ? '<button class="btn btn-green btn-sm" data-inv="'+invId+'" data-price="'+sellPrice+'" onclick="sellItemClick(this)">Vender</button>'
-        : '<span style="font-size:10px;color:var(--text-muted)">Desequipe antes</span>');
+    const isSel = _sellSelected.has(invId);
+    if (canSell) {
+      actions = '<div class="sell-price-tag" style="color:'+(isSel?'var(--gold)':'')+'">💰 ⬡ '+sellPrice.toLocaleString()+'</div>'
+        + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">'+(isSel?'✓ Selecionado':'Clique para selecionar')+'</div>';
+    } else {
+      actions = '<div class="sell-price-tag" style="color:var(--text-muted)">Desequipe antes</div>';
+    }
   } else if (mode === 'trade') {
     const canTrade = !equipped;
     const isSel = _tradeSelectedInvId === invId;
@@ -3823,6 +3840,25 @@ function buildInvItemCard(invId, mode) {
       + '<div class="shop-item-name" style="color:'+grade.color+'">'+it.name+refStr+luckyStr+classStar+'</div>'
       + '<div class="shop-item-stats">'+it.desc+(refTotal>0?' +'+refTotal+'/stat':'')+'</div>'
       + (canTrade ? '<span style="font-size:10px;color:var(--green-light)">Clique para selecionar</span>' : '<span style="font-size:10px;color:var(--text-muted)">Desequipe antes</span>')
+      + '</div>';
+  }
+
+  // SELL mode — clickable card with checkmark
+  if (mode === 'sell') {
+    const canSell   = !equipped;
+    const isSellSel = _sellSelected.has(invId);
+    const sellPrice = calcSellPriceClient(invId);
+    return '<div class="shop-item sell-item-selectable'+(isSellSel?' sell-selected':'')+(equipped?' opacity-50':'')+'"'
+      + (canSell ? ' data-inv="'+invId+'" data-price="'+sellPrice+'" onclick="toggleSellSelect(this.dataset.inv,parseInt(this.dataset.price))"' : '')
+      + ' style="border-color:'+(isSellSel?'var(--gold)':grade.color+'44')+';'+(grade.glow?'box-shadow:'+grade.glow:'')+'">'
+      + '<div class="shop-item-icon">'+it.icon+'</div>'
+      + getItemGradeBadge(it.grade)
+      + classBadge
+      + '<div class="shop-item-name" style="color:'+grade.color+'">'+it.name+refStr+luckyStr+classStar+'</div>'
+      + '<div class="shop-item-stats">'+it.desc+'</div>'
+      + (canSell
+        ? '<div style="font-size:12px;color:'+(isSellSel?'var(--gold)':'var(--green-light)')+'">⬡ '+sellPrice.toLocaleString()+(isSellSel?' ✓':'')+'</div>'
+        : '<div style="font-size:11px;color:var(--text-muted)">Desequipe antes</div>')
       + '</div>';
   }
 
@@ -8999,6 +9035,88 @@ function registerGroupSSEHandlers() {
     _groupRoom = null;
     api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState; updateUI(); updateInfirmaryBanner();} });
   });
+}
+
+
+// ══════════════════════════════════════════════════════════
+// MULTI-SELECT SELL
+// ══════════════════════════════════════════════════════════
+const _sellSelected = new Map(); // invId → price
+
+function toggleSellSelect(invId, price) {
+  if (_sellSelected.has(invId)) {
+    _sellSelected.delete(invId);
+  } else {
+    _sellSelected.set(invId, price);
+  }
+  updateSellSummary();
+  renderInventory('sell');
+}
+
+function updateSellSummary() {
+  const count    = _sellSelected.size;
+  const total    = [..._sellSelected.values()].reduce((s,p) => s+p, 0);
+  const summary  = document.getElementById('sell-summary');
+  const btn      = document.getElementById('sell-all-btn');
+  if (summary) {
+    summary.textContent = count > 0
+      ? count + ' item(s) selecionado(s) · ⬡ ' + total.toLocaleString() + ' ouro'
+      : 'Nenhum selecionado';
+    summary.style.color = count > 0 ? 'var(--gold)' : 'var(--text-muted)';
+  }
+  if (btn) btn.disabled = count === 0;
+}
+
+function sellSelectAll() {
+  const inv = (G.inventory||[]).filter(id => findItem(id));
+  const equipped = Object.values(G.equipment||{});
+  inv.forEach(id => {
+    if (!equipped.includes(id)) {
+      _sellSelected.set(id, calcSellPriceClient(id));
+    }
+  });
+  updateSellSummary();
+  renderInventory('sell');
+}
+
+function sellDeselectAll() {
+  _sellSelected.clear();
+  updateSellSummary();
+  renderInventory('sell');
+}
+
+async function sellSelected() {
+  if (_sellSelected.size === 0) return;
+  const count    = _sellSelected.size;
+  const total    = [..._sellSelected.values()].reduce((s,p) => s+p, 0);
+  const idsToSell= [..._sellSelected.keys()];
+
+  const btn = document.getElementById('sell-all-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Vendendo...'; }
+
+  // Send all to server at once
+  const res = await api('POST', '/api/item/sell-batch', { items: idsToSell });
+
+  if (btn) { btn.disabled = false; btn.textContent = '💰 Vender Selecionados'; }
+
+  if (res.error) { toast(res.error, 'bad'); return; }
+
+  // Apply results locally
+  G.gold = (G.gold||0) + res.totalGold;
+  idsToSell.forEach(id => {
+    const idx = G.inventory.indexOf(id);
+    if (idx !== -1) G.inventory.splice(idx, 1);
+  });
+
+  _sellSelected.clear();
+  updateSellSummary();
+
+  toast('💰 Vendeu ' + res.count + ' ite(ns) por ⬡ ' + res.totalGold.toLocaleString() + ' ouro!', 'good');
+  addLog('💰 Vendeu ' + res.count + ' item(s) por ⬡ ' + res.totalGold.toLocaleString() + ' ouro.', 'good');
+
+  updateUI();
+  renderInventory('sell');
+  forceSave();
 }
 
 </script>
