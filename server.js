@@ -1801,21 +1801,12 @@ async function handleRequest(req, res) {
     const hisPower = calcPower(gt);
 
     // ── POWER DIFFERENCE LIMIT ──────────────────────────────────────────────
-    const MIN_POWER_TO_PVP = 300; // must have at least 300 power to PvP
-    const MAX_POWER_DIFF   = 300; // cannot attack someone 300+ power below you
+    // ── PvP RULE: target must have at least 1000 power ─────────────────────
+    // No upper difference limit — anyone can attack anyone above 1000 power
+    const MIN_TARGET_POWER = 1000;
 
-    if (myPower < MIN_POWER_TO_PVP) {
-      send(res,400,{error:'Você precisa ter pelo menos 300 de poder para batalhar. (Atual: '+myPower+')'}); return;
-    }
-    if (hisPower < MIN_POWER_TO_PVP) {
-      send(res,400,{error:gt.name+' ainda não tem poder suficiente para batalhar ('+hisPower+'/300).'}); return;
-    }
-    if (myPower - hisPower > MAX_POWER_DIFF) {
-      const minTarget = myPower - MAX_POWER_DIFF;
-      send(res,400,{error:'Diferença de poder muito alta! Você ('+myPower+') só pode atacar jogadores com '+minTarget+'+ de poder.'}); return;
-    }
-    if (hisPower - myPower > MAX_POWER_DIFF) {
-      send(res,400,{error:gt.name+' ('+hisPower+') é muito mais forte que você ('+myPower+'). Diferença máxima: 300.'}); return;
+    if (hisPower < MIN_TARGET_POWER) {
+      send(res,400,{error:gt.name+' tem apenas '+hisPower+' de poder. Mínimo para duelo: 1.000.'}); return;
     }
 
     const STATS = ['str','dex','mag','res'];

@@ -7641,14 +7641,10 @@ async function renderTavernPlayers() {
             : (() => {
                 const myPwr  = calcPowerClient(G); // unified formula
                 const hisPwr = p.power || 0;
-                const tooWeakMe   = myPwr  < 300;
-                const tooWeakThem = hisPwr < 300;
-                const tooStrong   = (myPwr - hisPwr) > 300;
-                const locked = tooWeakMe || tooWeakThem || tooStrong;
-                const tip = tooWeakMe   ? 'Precisa de 300+ poder para PvP ('+myPwr+'/300)'
-                          : tooWeakThem ? p.name+' ainda não tem 300 poder ('+hisPwr+')'
-                          : tooStrong   ? 'Dif. muito alta! Seu poder: '+myPwr+' — mínimo alvo: '+(myPwr-300)
-                          : '';
+                // Only rule: target needs at least 1000 power
+                const tooWeakThem = hisPwr < 1000;
+                const locked = tooWeakThem;
+                const tip = tooWeakThem ? p.name+' tem apenas '+hisPwr+' poder (mín. 1.000 para duelo)' : '';
                 return locked
                   ? '<div style="text-align:right"><span class="badge" style="font-size:10px;color:var(--text-muted);background:rgba(0,0,0,.3)">🔒 '+tip+'</span></div>'
                   : '<button class="btn btn-red btn-sm" data-user="'+p.username+'" data-name="'+p.name+'" data-power="'+hisPwr+'" onclick="attackTavernPlayer(this)">⚔ Atacar</button>';
