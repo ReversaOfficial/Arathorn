@@ -2708,11 +2708,12 @@ const SHOP_ITEMS = {
 
 // ── GRADE DEFINITIONS ────────────────────────────────────────────────────────
 const ITEM_GRADES = {
-  normal:    { label:'Normal',     color:'#a89060', glow:'',                        dropRate:0.45 },
-  excellent: { label:'Excelente',  color:'#4da6ff', glow:'0 0 6px #4da6ff66',      dropRate:0.25 },
-  superrare: { label:'Super Raro', color:'#a259ff', glow:'0 0 8px #a259ff88',      dropRate:0.12 },
-  epic:      { label:'Épico',      color:'#ff7b00', glow:'0 0 10px #ff7b0099',     dropRate:0.04 },
-  supreme:   { label:'Supremo',    color:'#ff3c3c', glow:'0 0 14px #ff3c3cbb',     dropRate:0.005 },
+  normal:    { label:'Normal',     color:'#a89060', glow:'',                         dropRate:0.45  },
+  excellent: { label:'Excelente',  color:'#4da6ff', glow:'0 0 6px #4da6ff66',       dropRate:0.25  },
+  superrare: { label:'Super Raro', color:'#a259ff', glow:'0 0 8px #a259ff88',       dropRate:0.12  },
+  epic:      { label:'Épico',      color:'#ff7b00', glow:'0 0 10px #ff7b0099',      dropRate:0.04  },
+  supreme:   { label:'Supremo',    color:'#ff3c3c', glow:'0 0 14px #ff3c3cbb',      dropRate:0.005 },
+  legendary: { label:'Lendário',   color:'#ffd700', glow:'0 0 18px #ffd70099',      dropRate:0.001 },
 };
 
 // ── FORGE STONES ─────────────────────────────────────────────────────────────
@@ -3074,7 +3075,12 @@ function getItemDisplayName(invId) {
 
 function getItemGradeBadge(grade) {
   const g = ITEM_GRADES[grade] || ITEM_GRADES.normal;
-  return '<span class="badge" style="background:'+g.color+'22;color:'+g.color+';border-color:'+g.color+'55;font-size:10px">'+g.label+'</span>';
+  const icons = { normal:'', excellent:'✦', superrare:'✦✦', epic:'★', supreme:'★★', legendary:'👑' };
+  const icon = icons[grade] || '';
+  const glow = g.glow ? 'text-shadow:'+g.glow+';' : '';
+  return '<span style="display:inline-block;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:.5px;'
+    + 'background:'+g.color+'20;color:'+g.color+';border:1px solid '+g.color+'55;'
+    + glow+'">'+(icon?icon+' ':'')+g.label+'</span>';
 }
 function addLog(msg, cls='') {
   if (!G.log) G.log = [];
@@ -3893,12 +3899,24 @@ function buildInvItemCard(invId, mode) {
       + '</div>';
   }
 
-  return '<div class="shop-item '+(equipped&&mode==='equip'?' owned':'')+'" style="border-color:'+(equipped?'var(--gold-dark)':grade.color+'44')+';'+(grade.glow?'box-shadow:'+grade.glow:'')+'">'
-    + '<div class="shop-item-icon">'+it.icon+'</div>'
-    + getItemGradeBadge(it.grade)
+  // Grade-specific card style
+  const isRare   = ['superrare','epic','supreme','legendary'].includes(it.grade);
+  const nameGlow = grade.glow ? 'text-shadow:'+grade.glow+';' : '';
+  const cardBg   = equipped && mode==='equip'
+    ? 'background:rgba(201,168,76,.06);border-color:var(--gold-dark);'
+    : isRare
+      ? 'background:'+grade.color+'09;border-color:'+grade.color+'55;'+(grade.glow?'box-shadow:'+grade.glow+';':'')
+      : 'border-color:'+grade.color+'44;';
+
+  return '<div class="shop-item '+(equipped&&mode==='equip'?'owned':'')+'" style="'+cardBg+'">'
+    + '<div class="shop-item-icon" style="'+(isRare?'filter:drop-shadow(0 0 6px '+grade.color+'88);':'')+'">'+it.icon+'</div>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
+    +   getItemGradeBadge(it.grade)
+    +   (luckyStr ? '<span style="color:#ffd700;font-size:10px">🍀 Sortudo</span>' : '')
+    + '</div>'
     + classBadge
-    + '<div class="shop-item-name" style="color:'+grade.color+'">'+it.name+refStr+luckyStr+classStar+'</div>'
-    + '<div class="shop-item-stats">'+it.desc+(refTotal>0?' <span style="color:'+refColor+'">+'+refTotal+'/stat</span>':'')+'</div>'
+    + '<div class="shop-item-name" style="color:'+grade.color+';font-weight:700;'+nameGlow+'">'+it.name+refStr+classStar+'</div>'
+    + '<div class="shop-item-stats" style="color:'+grade.color+'99;">'+it.desc+(refTotal>0?' <span style="color:'+refColor+';font-weight:700">+'+refTotal+'/stat</span>':'')+'</div>'
     + actions
     + '</div>';
 }
