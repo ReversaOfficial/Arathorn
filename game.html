@@ -5994,6 +5994,18 @@ function doForge() {
   const stone = FORGE_STONES[forgeSelectedStoneId];
   if (!it || !stone) return;
 
+  // Locate item BEFORE consuming stone (so we can abort without waste)
+  const invIdx = (G.inventory||[]).indexOf(invId);
+  let equippedSlot = null;
+  Object.entries(G.equipment||{}).forEach(([slot, eId]) => { if (eId===invId) equippedSlot=slot; });
+
+  if (invIdx < 0 && !equippedSlot) {
+    toast('❌ Item não encontrado. Selecione o item novamente.', 'bad');
+    forgeSelectedInvId = null;
+    renderForgeSelectedCard();
+    return;
+  }
+
   // Consume stone
   const sIdx = (G.consumables||[]).indexOf(forgeSelectedStoneId);
   if (sIdx < 0) { toast('Pedra não encontrada!','bad'); return; }
@@ -6006,11 +6018,6 @@ function doForge() {
   const isHigh = nextLevel >= 7;
   const chance = getForgeChance(nextLevel, stone, lucky) / 100;
   const success = Math.random() < chance;
-
-  // Locate in inventory/equipment
-  const invIdx = (G.inventory||[]).indexOf(invId);
-  let equippedSlot = null;
-  Object.entries(G.equipment||{}).forEach(([slot, eId]) => { if (eId===invId) equippedSlot=slot; });
 
   // Record attempt (may trigger global punishment)
   recordForgeAttempt(invId);
@@ -6028,18 +6035,37 @@ function doForge() {
   } else {
     let newRefine = currentRefine; // default: stays same (+1~+6 prist_s)
     if (!safe && isHigh) {
-      // Ravika_s fail: RESET to +0
+      // Ravika_s/high-level fail: RESET to +0
       newRefine = 0;
     }
-    // prist_s fail on +4~+6: stays same (no descent, per new rules)
+
     const newId = (newRefine > 0 ? pureBase + '+' + newRefine : pureBase) + luckyTag;
-    if (invIdx >= 0) G.inventory[invIdx] = newId;
-    if (equippedSlot) G.equipment[equippedSlot] = newId;
+
+    // ── FIX: update BOTH inventory AND equipment atomically ──────────────
+    // If item is in inventory, update there
+    if (invIdx >= 0) {
+      G.inventory[invIdx] = newId;
+    }
+    // If item is equipped, update the equipment slot
+    if (equippedSlot) {
+      G.equipment[equippedSlot] = newId;
+    }
+    // If item was ONLY equipped (not in inventory), ensure we didn't miss it
+    // by scanning equipment again with the old id
+    if (invIdx < 0 && !equippedSlot) {
+      // Last resort: scan equipment for the old invId
+      Object.entries(G.equipment||{}).forEach(([slot, eId]) => {
+        if (eId === invId) G.equipment[slot] = newId;
+      });
+    }
+
+    // Always update forgeSelectedInvId to match the new actual id
     forgeSelectedInvId = newId;
+
     const resetMsg = (!safe && isHigh && newRefine===0) ? ' ⚠️ RESETADO PARA +0!' : '';
     addLog('💔 Falha! ' + it.name + resetMsg + ' Pedra perdida.', 'bad');
-    toast('💔 Falha!' + resetMsg, 'bad');
-    addForgeLog('<span style="color:var(--red-light)">❌ FALHA: ' + it.name + (resetMsg?' <b>'+resetMsg+'</b>':'') + '</span>');
+    toast('💔 Falha!' + (resetMsg ? resetMsg : ''), 'bad');
+    addForgeLog('<span style="color:var(--red-light)">❌ FALHA: ' + it.name + (resetMsg?' <b style="color:#ff4444">'+resetMsg+'</b>':'') + '</span>');
   }
 
   forgeSelectedStoneId = null;
