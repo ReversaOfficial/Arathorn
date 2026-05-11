@@ -2367,10 +2367,101 @@ const MISSIONS = [
   {id:48,type:'clan',icon:'🕳️',name:'Aliança no Vazio Eterno',            stam:8,minLv:800,clanSize:8,gold:[4000000,6500000],xp:[3200000,5120000],win:0.35,diff:'epic',enemies:['Entidade Void','Destruidor Cósmico']},
 
   // ── RAIDS ─────────────────────────────────────────────────────────────────
-  {id:49,type:'raid',icon:'🌋',name:'Raid: Montanha da Perdição',         stam:5,minLv:30, clanSize:8, gold:[5000,10000],    xp:[4000,8000],      win:0.42,diff:'epic',enemies:['Sauron']},
-  {id:50,type:'raid',icon:'🔥',name:'Raid: O Balrog dos Tempos Antigos',  stam:6,minLv:150,clanSize:8, gold:[50000,85000],   xp:[40000,68000],    win:0.38,diff:'epic',enemies:['Balrog Ancião','Durin Corrompido']},
-  {id:51,type:'raid',icon:'🕳️',name:'Raid: A Fissura do Caos',            stam:7,minLv:400,clanSize:10,gold:[500000,850000], xp:[400000,680000],  win:0.35,diff:'epic',enemies:['Primordial do Caos','Aberração Cósmica']},
-  {id:52,type:'raid',icon:'🌌',name:'Raid: O Fim dos Tempos',              stam:8,minLv:800,clanSize:10,gold:[8000000,13000000],xp:[6400000,10240000],win:0.30,diff:'epic',enemies:['O Deus do Caos','Exterminador de Mundos']},
+  // ══════════════════════════════════════════════════════════
+  // RAIDS POR ZONA — quanto mais alto o mapa, mais difícil
+  // Cada zona tem 1 raid. Dificuldade e recompensas escalam.
+  // Todos exigem grupo mínimo. Falha = todos na enfermaria.
+  // ══════════════════════════════════════════════════════════
+
+  // ZONA 1 — Mirkwood (lv 1-15) · Raid lv10 · 2 jogadores
+  {id:49,type:'raid',zone:'mirkwood',icon:'🌲',
+   name:'Raid: Rainha das Aranhas de Mirkwood',
+   desc:'Shelob-Mãe domina o coração negro da floresta. Seus filhos cobrem o chão.',
+   stam:4, minLv:10, clanSize:2,
+   gold:[3000,6000], xp:[2500,4800], win:0.55, diff:'hard',
+   drops:2, bonusItem:true,
+   enemies:['Shelob-Mãe','Tecelã Venenosa Ancestral','Guardião dos Ninhos']},
+
+  // ZONA 2 — Angmar (lv 10-40) · Raid lv20 · 3 jogadores
+  {id:50,type:'raid',zone:'angmar',icon:'👑',
+   name:'Raid: O Rei Bruxo de Angmar',
+   desc:'O líder dos Nazgûl desperta em seu trono de gelo. Seus servos mortos-vivos são incontáveis.',
+   stam:5, minLv:20, clanSize:3,
+   gold:[20000,38000], xp:[16000,30000], win:0.48, diff:'epic',
+   drops:3, bonusItem:true,
+   enemies:['Rei Bruxo','Nazgûl Tenente','Exército dos Mortos-Vivos']},
+
+  // ZONA 3 — Gondor (lv 25-60) · Raid lv40 · 3 jogadores
+  {id:51,type:'raid',zone:'gondor',icon:'🏯',
+   name:'Raid: O Senhor dos Oliphants',
+   desc:'Mumakil gigantes carregam fortalezas de guerra. Os Haradrim de elite os comandam.',
+   stam:5, minLv:40, clanSize:3,
+   gold:[80000,140000], xp:[64000,112000], win:0.45, diff:'epic',
+   drops:3, bonusItem:true,
+   enemies:['Mumakil Colossal','Comandante Haradrim','Bestia de Guerra']},
+
+  // ZONA 4 — Minas Morgul (lv 50-120) · Raid lv70 · 4 jogadores
+  {id:52,type:'raid',zone:'minas',icon:'🌙',
+   name:'Raid: Os Nove Cavaleiros do Apocalipse',
+   desc:'Todos os Nazgûl reunidos em Minas Morgul. Cada um mais poderoso que qualquer ser mortal.',
+   stam:6, minLv:70, clanSize:4,
+   gold:[350000,580000], xp:[280000,464000], win:0.42, diff:'epic',
+   drops:4, bonusItem:true,
+   enemies:['Khamûl o Sombrio','Os Nove Nazgûl','Entidade de Minas Morgul']},
+
+  // ZONA 5 — Erebor (lv 80-150) · Raid lv100 · 4 jogadores
+  {id:53,type:'raid',zone:'erebor',icon:'🐉',
+   name:'Raid: Smaug, o Devastador',
+   desc:'Smaug desperta das profundezas de Erebor. Seu fogo derrete armaduras e a terra treme.',
+   stam:6, minLv:100, clanSize:4,
+   gold:[900000,1500000], xp:[720000,1200000], win:0.40, diff:'epic',
+   drops:4, bonusItem:true,
+   enemies:['Smaug','Criatura das Profundezas','Guardião do Tesouro Ancestral']},
+
+  // ZONA 6 — Mordor (lv 100-180) · Raid lv140 · 5 jogadores
+  {id:54,type:'raid',zone:'mordor',icon:'🌋',
+   name:'Raid: Sauron, o Senhor do Um Anel',
+   desc:'O próprio Sauron ergueu-se de suas cinzas. Mais poderoso do que jamais foi. Poucos retornam.',
+   stam:7, minLv:140, clanSize:5,
+   gold:[4000000,6500000], xp:[3200000,5200000], win:0.35, diff:'epic',
+   drops:5, bonusItem:true,
+   enemies:['Sauron Ressurgido','Olho de Sauron Manifestado','Servo da Extinção']},
+
+  // ZONA 7 — Khazad-dûm (lv 150-300) · Raid lv200 · 6 jogadores
+  {id:55,type:'raid',zone:'khazad',icon:'🔥',
+   name:'Raid: Balrog Ancestral das Eras',
+   desc:'Durin Corrompido em sua forma mais pura. O fogo eterno das profundezas consome tudo.',
+   stam:7, minLv:200, clanSize:6,
+   gold:[18000000,30000000], xp:[14400000,24000000], win:0.32, diff:'epic',
+   drops:5, bonusItem:true,
+   enemies:['Durin Corrompido Ressurgido','Balrog das Eras','Elemental de Fogo Primordial']},
+
+  // ZONA 8 — Dol Guldur (lv 250-500) · Raid lv350 · 7 jogadores
+  {id:56,type:'raid',zone:'doldur',icon:'👁️',
+   name:'Raid: O Necromante Eterno',
+   desc:'Sauron em forma pura de Necromante, convocando exércitos de espectros. A realidade se dobra.',
+   stam:8, minLv:350, clanSize:7,
+   gold:[80000000,135000000], xp:[64000000,108000000], win:0.28, diff:'epic',
+   drops:6, bonusItem:true,
+   enemies:['O Necromante','Legião dos Espectros Eternos','Arauto do Apocalipse']},
+
+  // ZONA 9 — Valinor (lv 400-700) · Raid lv500 · 8 jogadores
+  {id:57,type:'raid',zone:'valinor',icon:'⚡',
+   name:'Raid: Morgoth, o Deus Negro',
+   desc:'O próprio Morgoth, mais poderoso que Sauron, retornou do Void. Os Valar tremem.',
+   stam:9, minLv:500, clanSize:8,
+   gold:[600000000,1000000000], xp:[480000000,800000000], win:0.25, diff:'epic',
+   drops:7, bonusItem:true,
+   enemies:['Morgoth','Vala Corrompido','Aniquilador de Mundos']},
+
+  // ZONA 10 — Void (lv 600+) · Raid lv700 · 10 jogadores
+  {id:58,type:'raid',zone:'void',icon:'🌌',
+   name:'Raid: O Deus do Caos Primordial',
+   desc:'Uma entidade além da compreensão mortal. Criou o vazio antes do tempo. A morte é misericórdia.',
+   stam:10, minLv:700, clanSize:10,
+   gold:[5000000000,8000000000], xp:[4000000000,6400000000], win:0.20, diff:'epic',
+   drops:8, bonusItem:true,
+   enemies:['O Sem-Nome','Fragmento da Extinção','A Vontade do Caos']},
 
   // ── CRIMES ─────────────────────────────────────────────────────────────────
   {id:53,type:'crime',icon:'🎭',name:'Roubar da Mercearia do Porto',      stam:1,minLv:1,  gold:[8,20],     xp:[6,14],     win:0.80,diff:'easy',jail:true,jailTime:30},
@@ -8891,7 +8982,7 @@ async function openGroupLobby(missionId) {
   if (isRestricted()) return;
   const m = MISSIONS.find(x => x.id === missionId);
   if (!m) return;
-  const isRaid   = m.type === 'raid';
+  const isRaid   = m.type === 'raid' || (m.id >= 49 && m.id <= 58);
   const isLeader = isRaid || G.clanRole === 'leader';
 
   if (!isLeader) {

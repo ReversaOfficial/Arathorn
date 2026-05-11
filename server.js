@@ -3323,7 +3323,7 @@ async function handleRequest(req, res) {
     const g = user.gameState;
     // For raids (id 49-52): any player can create, no clan required
     // For clan missions (id 42-48): must have a clan (leader check done client-side)
-    const isRaid = [49,50,51,52].includes(Number(missionId));
+    const isRaid = Number(missionId) >= 49 && Number(missionId) <= 58;
     if (!isRaid && !g.clanName) { send(res,400,{error:'Missoes de cla requerem um cla.'}); return; }
     if (isRestricted(g)) { send(res,400,{error:'Voce esta preso ou na enfermaria.'}); return; }
     if (!db.groupRooms) db.groupRooms = {};
@@ -3337,7 +3337,7 @@ async function handleRequest(req, res) {
     );
     if (existing) { send(res,400,{error:'Voce ja esta em uma sala. Cancele antes de criar outra.'}); return; }
     const roomId = 'grp_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-    const isRaidMission = [49,50,51,52].includes(Number(missionId));
+    const isRaidMission = Number(missionId) >= 49 && Number(missionId) <= 58;
     db.groupRooms[roomId] = {
       id: roomId, missionId, clanName: isRaidMission ? null : g.clanName,
       isRaid: isRaidMission,
@@ -3375,7 +3375,7 @@ async function handleRequest(req, res) {
     const user = db.users[username];
     if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
     const g = user.gameState;
-    const isRaidRoom = [49,50,51,52].includes(Number(room.missionId));
+    const isRaidRoom = Number(room.missionId) >= 49 && Number(room.missionId) <= 58;
     if (!isRaidRoom && g.clanName !== room.clanName) {
       send(res,403,{error:'Voce nao pertence ao cla desta missao.'}); return;
     }
@@ -3428,7 +3428,7 @@ async function handleRequest(req, res) {
     const db = loadDB();
     const room = db.groupRooms && db.groupRooms[roomId];
     if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
-    const isRaidStart = room.isRaid || [49,50,51,52].includes(Number(room.missionId));
+    const isRaidStart = room.isRaid || (Number(room.missionId) >= 49 && Number(room.missionId) <= 58);
     // Raids: anyone in the room can start; clan missions: only the room creator
     if (!isRaidStart && room.leader !== username) {
       send(res,403,{error:'Apenas o lider pode iniciar missoes de cla.'}); return;
@@ -3439,6 +3439,7 @@ async function handleRequest(req, res) {
     if (room.status !== 'waiting') { send(res,400,{error:'Sala ja iniciada.'}); return; }
     // Find mission definition on server
     const CLAN_MISSIONS = {
+      // Clan missions
       42:{clanSize:3,stam:3,gold:[200,400],xp:[200,350],win:0.75},
       43:{clanSize:4,stam:4,gold:[1000,1800],xp:[800,1300],win:0.65},
       44:{clanSize:5,stam:5,gold:[5000,9000],xp:[4000,6500],win:0.55},
@@ -3446,10 +3447,17 @@ async function handleRequest(req, res) {
       46:{clanSize:6,stam:6,gold:[120000,200000],xp:[96000,153600],win:0.45},
       47:{clanSize:6,stam:7,gold:[600000,975000],xp:[480000,768000],win:0.40},
       48:{clanSize:8,stam:8,gold:[4000000,6500000],xp:[3200000,5120000],win:0.35},
-      49:{clanSize:8,stam:5,gold:[5000,10000],xp:[4000,8000],win:0.42},
-      50:{clanSize:8,stam:6,gold:[50000,85000],xp:[40000,68000],win:0.38},
-      51:{clanSize:10,stam:7,gold:[500000,850000],xp:[400000,680000],win:0.35},
-      52:{clanSize:10,stam:8,gold:[8000000,13000000],xp:[6400000,10240000],win:0.30},
+      // Raids por zona
+      49:{clanSize:2, stam:4, gold:[3000,6000],           xp:[2500,4800],           win:0.55},
+      50:{clanSize:3, stam:5, gold:[20000,38000],          xp:[16000,30000],         win:0.48},
+      51:{clanSize:3, stam:5, gold:[80000,140000],         xp:[64000,112000],        win:0.45},
+      52:{clanSize:4, stam:6, gold:[350000,580000],        xp:[280000,464000],       win:0.42},
+      53:{clanSize:4, stam:6, gold:[900000,1500000],       xp:[720000,1200000],      win:0.40},
+      54:{clanSize:5, stam:7, gold:[4000000,6500000],      xp:[3200000,5200000],     win:0.35},
+      55:{clanSize:6, stam:7, gold:[18000000,30000000],    xp:[14400000,24000000],   win:0.32},
+      56:{clanSize:7, stam:8, gold:[80000000,135000000],   xp:[64000000,108000000],  win:0.28},
+      57:{clanSize:8, stam:9, gold:[600000000,1000000000], xp:[480000000,800000000], win:0.25},
+      58:{clanSize:10,stam:10,gold:[5000000000,8000000000],xp:[4000000000,6400000000],win:0.20},
     };
     const mDef = CLAN_MISSIONS[room.missionId];
     if (!mDef) { send(res,400,{error:'Missao invalida.'}); return; }
