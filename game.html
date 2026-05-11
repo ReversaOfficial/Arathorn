@@ -1562,6 +1562,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
           <div class="tab active" onclick="rankTab(this,'power')">⚡ Poder Geral</div>
           <div class="tab" onclick="rankTab(this,'pvp')">⚔ PvP Duelos</div>
           <div class="tab" onclick="rankTab(this,'class')">🧝 Por Classe</div>
+          <div class="tab" onclick="rankTab(this,'clanwars')">⚔ Guerras</div>
           <div class="tab" onclick="rankTab(this,'clans')">🛡 Clãs</div>
         </div>
         <div id="rank-power"><div id="rank-list-power"></div></div>
@@ -1578,6 +1579,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
           <div id="rank-list-class"></div>
         </div>
         <div id="rank-clans" style="display:none"><div id="rank-list-clans"></div></div>
+        <div id="rank-clanwars" style="display:none"><div id="rank-list-clanwars"></div></div>
       </div>
 
 
@@ -3605,11 +3607,12 @@ function renderShopSets(race) {
 function rankTab(el, tab) {
   document.querySelectorAll('#page-ranking > .tabs > .tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
-  ['power','pvp','class','clans'].forEach(t => {
+  ['power','pvp','class','clans','clanwars'].forEach(t => {
     const el2 = document.getElementById('rank-'+t);
     if (el2) el2.style.display = t===tab ? '' : 'none';
   });
   if (tab==='class') renderRankClass(document.querySelector('#rank-class-tabs .tab.active')?.dataset?.race||'elfo');
+  if (tab==='clanwars') renderWarRanking();
 }
 
 function rankClassTab(el, race) {
@@ -5286,6 +5289,7 @@ function initGame() {
   setTimeout(registerRaidSSEHandlers, 1600);
   setTimeout(registerClanMissionSSEHandler, 1700);
   setTimeout(registerGroupSSEHandlers, 1800);
+  setTimeout(registerWarSSEHandlers, 1900);
   setTimeout(loadPartyState, 1500);
   setTimeout(loadServerAssassin, 2000);
   if (!G.friends) G.friends = [];
@@ -5659,8 +5663,8 @@ async function renderClanWar() {
 
 async function declareWar(btn) {
   const targetClan = btn.dataset.clan;
-  if (!confirm('Declarar guerra contra o clã "' + targetClan + '"?\n\nO clã perdedor terá 20% do ouro de cada membro saqueado para o tesouro do clã vencedor!')) return;
-  const res = await api('POST', '/api/clanwar/declare', { targetClan });
+  if (!confirm('Desafiar "'+targetClan+'" para guerra? O líder deles precisa ACEITAR.\nVencedor saqueia 15% do ouro de cada perdedor.')) return;
+  const res = await api('POST', '/api/clanwar/challenge', { targetClan });
   if (res.error) { toast(res.error, 'bad'); return; }
   const war = res.war;
   const won = war.winner === G.clanName;
@@ -9348,6 +9352,103 @@ async function sellSelected() {
   updateUI();
   renderInventory('sell');
   forceSave();
+}
+
+
+// ══════════════════════════════════════════════════════════
+// CLAN WAR — Challenge/Accept system + Ranking
+// ══════════════════════════════════════════════════════════
+
+async function renderWarRanking() {
+  const list = document.getElementById('rank-list-clanwars');
+  if (!list) return;
+  list.innerHTML = '<div style="color:var(--text-muted);padding:16px;text-align:center">Carregando...</div>';
+  const res = await api('GET', '/api/clanwar/ranking');
+  if (res.error || !res.ranking) { list.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">Nenhuma guerra ainda.</div>'; return; }
+  const medals = ['🥇','🥈','🥉'];
+  list.innerHTML = res.ranking.length ? res.ranking.map((r, i) => {
+    const isMe = G.clanName === r.clan;
+    return '<div class="rank-row" style="'+(isMe?'border-color:var(--gold);background:rgba(201,168,76,.06)':'')+'">'
+      + '<div class="rank-pos '+(i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'')+'">'+(medals[i]||('#'+(i+1)))+'</div>'
+      + '<div style="font-family:Cinzel,serif;font-size:13px;flex:1">['+r.tag+'] '+r.clan+(isMe?' <span style="font-size:10px;color:var(--text-muted)">(Meu)</span>':'')+'</div>'
+      + '<div style="color:var(--gold);font-weight:700;font-size:14px">⚔ '+r.wins+' vitória'+(r.wins!==1?'s':'')+'</div>'
+      + '</div>';
+  }).join('') : '<div style="color:var(--text-muted);padding:20px;text-align:center">Nenhuma guerra ainda.</div>';
+}
+
+function registerWarSSEHandlers() {
+  if (!sseConn) return;
+
+  // Received a war challenge — show accept/decline modal
+  sseConn.addEventListener('war_challenge', e => {
+    const d = JSON.parse(e.data);
+    if (G.clanRole !== 'leader') {
+      toast('⚔ Seu clã foi desafiado por ['+d.challengerTag+'] '+d.challengerClan+'!','info');
+      addLog('⚔ Desafio de guerra recebido de '+d.challengerClan,'info');
+      return;
+    }
+    const expiresIn = Math.round((d.expiresAt - Date.now()) / 60000);
+    showModal(
+      '⚔ Desafio de Guerra!',
+      '<div style="text-align:center">'
+      + '<div style="font-size:48px;margin-bottom:10px">⚔</div>'
+      + '<div style="font-family:Cinzel,serif;font-size:16px;color:var(--gold);margin-bottom:8px">'
+      +   '['+d.challengerTag+'] '+d.challengerClan
+      + '</div>'
+      + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">'
+      +   '<b>'+d.challengerLeaderName+'</b> desafiou seu clã para uma Guerra!'
+      + '</div>'
+      + '<div style="background:rgba(192,40,40,.1);border:1px solid rgba(192,40,40,.4);border-radius:var(--radius);padding:12px;font-size:12px">'
+      +   '⚠️ Se aceitar, ambos os clãs lutam imediatamente.<br>'
+      +   'Perdedores perdem <b>15%</b> do ouro — dividido entre os vencedores.<br>'
+      +   '⏳ Expira em '+expiresIn+' minutos.'
+      + '</div></div>',
+      [
+        { label:'✕ Recusar', fn: async () => {
+          closeModal();
+          await api('POST', '/api/clanwar/respond', { challengeId: d.challengeId, accept: false });
+          toast('Desafio recusado.','info');
+        }},
+        { label:'⚔ ACEITAR GUERRA!', cls:'btn-red', fn: async () => {
+          closeModal();
+          const res = await api('POST', '/api/clanwar/respond', { challengeId: d.challengeId, accept: true });
+          if (res.error) { toast(res.error,'bad'); return; }
+          // Result comes via war_result SSE
+        }}
+      ]
+    );
+  });
+
+  // War challenge declined
+  sseConn.addEventListener('war_declined', e => {
+    const d = JSON.parse(e.data);
+    toast('🛡 '+d.targetClan+' recusou o desafio de guerra.','info');
+    addLog('🛡 '+d.targetClan+' recusou o desafio.','info');
+  });
+
+  // War result (for all members of both clans)
+  sseConn.addEventListener('war_result', e => {
+    const d = JSON.parse(e.data);
+    if (d.won) {
+      showModal(
+        '🏆 Vitória na Guerra!',
+        '<div style="text-align:center">'
+        + '<div style="font-size:48px;margin-bottom:8px">🏆</div>'
+        + '<div style="font-family:Cinzel,serif;font-size:16px;color:var(--gold);margin-bottom:8px">'+d.winClan+' VENCEU!</div>'
+        + '<div style="font-size:13px;margin-bottom:12px">'+d.loseClan+' foi derrotado!</div>'
+        + '<div style="background:rgba(40,120,40,.1);border:1px solid rgba(40,120,40,.4);border-radius:var(--radius);padding:12px">'
+        +   '<div style="font-size:22px;font-weight:700;color:var(--green-light)">+⬡ '+(d.goldEach||0).toLocaleString()+' ouro</div>'
+        +   '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Espólios divididos entre '+(d.members||1)+' membros</div>'
+        + '</div></div>',
+        [{label:'🏆 Glória!', cls:'btn-gold', fn:closeModal}]
+      );
+      toast('🏆 Guerra vencida! +⬡'+(d.goldEach||0).toLocaleString()+' ouro!','good');
+    } else {
+      toast('💀 Guerra perdida para '+d.winClan+'. Ouro saqueado.','bad');
+      addLog('💀 Guerra perdida para '+d.winClan,'bad');
+    }
+    api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState;updateUI();} });
+  });
 }
 
 </script>

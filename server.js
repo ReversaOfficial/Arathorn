@@ -1078,100 +1078,211 @@ async function handleRequest(req, res) {
   // ═══════════════════════════════════════
 
   // Declarar guerra
-  if (method === 'POST' && url === '/api/clanwar/declare') {
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CLAN WAR SYSTEM — Leader challenges, opposing leader must ACCEPT
+  // Resources split equally among participants who joined the battle
+  // War ranking tracked globally
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // POST /api/clanwar/challenge — send challenge to another clan's leader
+  if (method === 'POST' && url === '/api/clanwar/challenge') {
     const username = verifyToken(getToken(req));
-    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
     const { targetClan } = await readBody(req);
     const db = loadDB();
     const user = db.users[username];
-    if (!user||!user.gameState) { send(res, 400, { error: 'Personagem nao encontrado.' }); return; }
-    const myClan = user.gameState.clanName;
-    if (!myClan) { send(res, 400, { error: 'Voce nao possui um cla.' }); return; }
-    if (user.gameState.clanRole !== 'leader') { send(res, 403, { error: 'Apenas o lider pode declarar guerras.' }); return; }
-    if (!targetClan || targetClan === myClan) { send(res, 400, { error: 'Cla alvo invalido.' }); return; }
-    if (!db.clanWars) db.clanWars = [];
-
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+    if (!g.clanName) { send(res,400,{error:'Voce nao possui um cla.'}); return; }
+    if (g.clanRole !== 'leader') { send(res,403,{error:'Apenas o lider pode declarar guerras.'}); return; }
+    if (!targetClan || targetClan === g.clanName) { send(res,400,{error:'Cla alvo invalido.'}); return; }
+    // Find target clan leader
     const allUsers = Object.values(db.users).filter(u => u.gameState);
-    const c1m = allUsers.filter(u => u.gameState.clanName===myClan);
-    const c2m = allUsers.filter(u => u.gameState.clanName===targetClan);
-    if (!c2m.length) { send(res, 404, { error: 'Cla alvo nao encontrado.' }); return; }
+    const targetLeaderEntry = allUsers.find(u => u.gameState.clanName===targetClan && u.gameState.clanRole==='leader');
+    if (!targetLeaderEntry) { send(res,404,{error:'Cla "'+targetClan+'" nao encontrado ou sem lider.'}); return; }
+    const targetLeader = targetLeaderEntry.username;
+    // Check no pending challenge between these clans
+    if (!db.clanChallenges) db.clanChallenges = [];
+    const existing = db.clanChallenges.find(c => c.status==='pending' &&
+      ((c.challengerClan===g.clanName&&c.targetClan===targetClan) ||
+       (c.challengerClan===targetClan&&c.targetClan===g.clanName)));
+    if (existing) { send(res,409,{error:'Ja existe um desafio pendente entre estes clas.'}); return; }
+    const challenge = {
+      id: crypto.randomBytes(8).toString('hex'),
+      challengerClan: g.clanName, challengerTag: g.clanTag||'---',
+      challengerLeader: username, challengerLeaderName: g.name,
+      targetClan, targetTag: targetLeaderEntry.gameState.clanTag||'---',
+      targetLeader,
+      status: 'pending',
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 30*60*1000, // 30 min to accept
+    };
+    db.clanChallenges.push(challenge);
+    saveDB(db);
+    // Notify target leader
+    sendSSE(targetLeader, 'war_challenge', {
+      challengeId: challenge.id,
+      challengerClan: g.clanName, challengerTag: g.clanTag||'---',
+      challengerLeaderName: g.name,
+      expiresAt: challenge.expiresAt,
+    });
+    console.log('[WAR] Desafio enviado:', g.clanName, '->', targetClan);
+    send(res,200,{ok:true, challengeId:challenge.id}); return;
+  }
+
+  // POST /api/clanwar/respond — target leader accepts or declines
+  if (method === 'POST' && url === '/api/clanwar/respond') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { challengeId, accept } = await readBody(req);
+    const db = loadDB();
+    if (!db.clanChallenges) db.clanChallenges = [];
+    const challenge = db.clanChallenges.find(c => c.id===challengeId);
+    if (!challenge) { send(res,404,{error:'Desafio nao encontrado.'}); return; }
+    if (challenge.targetLeader !== username) { send(res,403,{error:'Apenas o lider alvo pode responder.'}); return; }
+    if (challenge.status !== 'pending') { send(res,400,{error:'Desafio ja respondido.'}); return; }
+    if (challenge.expiresAt < Date.now()) { challenge.status='expired'; saveDB(db); send(res,400,{error:'Desafio expirado.'}); return; }
+
+    if (!accept) {
+      challenge.status = 'declined';
+      saveDB(db);
+      sendSSE(challenge.challengerLeader, 'war_declined', {
+        targetClan: challenge.targetClan,
+        msg: challenge.targetClan+' recusou o desafio de guerra.'
+      });
+      send(res,200,{ok:true, accepted:false}); return;
+    }
+
+    // ACCEPTED — resolve the war
+    challenge.status = 'accepted';
+    const allUsers = Object.values(db.users).filter(u => u.gameState);
+    const c1m = allUsers.filter(u => u.gameState.clanName===challenge.challengerClan);
+    const c2m = allUsers.filter(u => u.gameState.clanName===challenge.targetClan);
+    if (!c1m.length || !c2m.length) { send(res,400,{error:'Cla(s) sem membros.'}); return; }
 
     const c1p = c1m.reduce((s,u)=>s+calcPower(u.gameState),0);
     const c2p = c2m.reduce((s,u)=>s+calcPower(u.gameState),0);
-    const c1Wins = c1p*(0.92+Math.random()*0.16) >= c2p*(0.92+Math.random()*0.16);
-    const [winM, loseM, winClan, loseClan] = c1Wins ? [c1m,c2m,myClan,targetClan] : [c2m,c1m,targetClan,myClan];
+    const c1Wins = c1p*(0.90+Math.random()*0.20) >= c2p*(0.90+Math.random()*0.20);
 
+    const [winM, loseM, winClan, loseClan, winTag, loseTag] = c1Wins
+      ? [c1m, c2m, challenge.challengerClan, challenge.targetClan, challenge.challengerTag, challenge.targetTag]
+      : [c2m, c1m, challenge.targetClan, challenge.challengerClan, challenge.targetTag, challenge.challengerTag];
+
+    // Resources: losers lose 15% gold each, total split equally among WINNERS
     let totalSpoils = 0;
     loseM.forEach(u => {
       const g = u.gameState;
-      const lost = Math.max(0, Math.round((g.gold||0)*0.20));
-      g.gold = Math.max(0,(g.gold||0)-lost); totalSpoils += lost;
-      if (!g.stats) g.stats = {}; g.stats.warLosses=(g.stats.warLosses||0)+1;
+      const lost = Math.max(0, Math.round((g.gold||0)*0.15));
+      g.gold = Math.max(0,(g.gold||0)-lost);
+      totalSpoils += lost;
+      if (!g.stats) g.stats = {};
+      g.stats.warLosses = (g.stats.warLosses||0)+1;
       if (!g.log) g.log = [];
-      g.log.unshift({ msg:'🏴 Guerra: '+loseClan+' foi derrotado por '+winClan+'. -'+lost+' ouro saqueado.', cls:'bad' });
-      db.users[u.username].gameState = g;
+      g.log.unshift({msg:'🏴 Guerra: '+loseClan+' derrotado por '+winClan+'. -'+lost.toLocaleString()+' ouro saqueado.', cls:'bad'});
+      sendSSE(u.username, 'war_result', {won:false, winClan, loseClan, spoils:lost});
     });
+
+    // Split spoils equally among all winners
+    const goldEach = winM.length > 0 ? Math.round(totalSpoils / winM.length) : 0;
     winM.forEach(u => {
       const g = u.gameState;
-      if (!g.stats) g.stats = {}; g.stats.warWins=(g.stats.warWins||0)+1;
+      g.gold = (g.gold||0) + goldEach;
+      if (!g.stats) g.stats = {};
+      g.stats.warWins = (g.stats.warWins||0)+1;
+      if (g.clanRole==='leader') g.clanWins=(g.clanWins||0)+1;
       if (!g.log) g.log = [];
-      g.log.unshift({ msg:'🏆 Guerra: '+winClan+' venceu '+loseClan+'! Espolios: '+totalSpoils+' ouro no tesouro.', cls:'good' });
-      if (g.clanRole==='leader') { g.clanGold=(g.clanGold||0)+totalSpoils; g.clanWins=(g.clanWins||0)+1; }
-      db.users[u.username].gameState = g;
+      g.log.unshift({msg:'🏆 Guerra: '+winClan+' venceu '+loseClan+'! +'+goldEach.toLocaleString()+' ouro ('+winM.length+' membros).', cls:'good'});
+      sendSSE(u.username, 'war_result', {won:true, winClan, loseClan, goldEach, totalSpoils, members:winM.length});
     });
+
+    // Update clan war ranking
+    if (!db.clanWarRanking) db.clanWarRanking = {};
+    db.clanWarRanking[winClan] = (db.clanWarRanking[winClan]||0) + 1;
 
     const war = {
       id: crypto.randomBytes(8).toString('hex'),
-      clan1: myClan, clan1Tag: user.gameState.clanTag||'---', clan1Power: c1p,
-      clan1Members: c1m.map(u=>({ username:u.username, name:u.gameState.name, power:calcPower(u.gameState) })),
-      clan2: targetClan, clan2Tag: c2m[0].gameState.clanTag||'---', clan2Power: c2p,
-      clan2Members: c2m.map(u=>({ username:u.username, name:u.gameState.name, power:calcPower(u.gameState) })),
-      status:'done', winner:winClan, loser:loseClan, totalSpoils,
-      declaredBy: username, declaredAt:Date.now(), resolvedAt:Date.now(),
+      clan1: challenge.challengerClan, clan1Tag: challenge.challengerTag, clan1Power: c1p,
+      clan1Members: c1m.map(u=>({username:u.username,name:u.gameState.name,power:calcPower(u.gameState)})),
+      clan2: challenge.targetClan, clan2Tag: challenge.targetTag, clan2Power: c2p,
+      clan2Members: c2m.map(u=>({username:u.username,name:u.gameState.name,power:calcPower(u.gameState)})),
+      status:'done', winner:winClan, loser:loseClan, winTag, loseTag,
+      totalSpoils, goldEach,
+      declaredAt: challenge.createdAt, resolvedAt: Date.now(),
     };
+
+    if (!db.clanWars) db.clanWars = [];
     db.clanWars.push(war);
-    if (db.clanWars.length>100) db.clanWars=db.clanWars.slice(-100);
+    if (db.clanWars.length>200) db.clanWars=db.clanWars.slice(-200);
     saveDB(db);
-    broadcastSSE('clan_war', { war });
-    send(res, 200, { ok:true, war });
-    return;
+    broadcastSSE('clan_war', {war});
+    send(res,200,{ok:true, war, accepted:true}); return;
   }
 
-  // Historico de guerras
+  // POST /api/clanwar/declare — legacy alias for challenge
+  if (method === 'POST' && url === '/api/clanwar/declare') {
+    // Redirect to challenge
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const body = await readBody(req);
+    const { targetClan } = body;
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+    if (!g.clanName||g.clanRole!=='leader') { send(res,403,{error:'Apenas lideres podem declarar guerra.'}); return; }
+    const allUsers2 = Object.values(db.users).filter(u=>u.gameState);
+    const targetLeaderE = allUsers2.find(u=>u.gameState.clanName===targetClan&&u.gameState.clanRole==='leader');
+    if (!targetLeaderE) { send(res,404,{error:'Cla alvo sem lider.'}); return; }
+    if (!db.clanChallenges) db.clanChallenges=[];
+    const ch={id:crypto.randomBytes(8).toString('hex'),challengerClan:g.clanName,challengerTag:g.clanTag||'---',
+      challengerLeader:username,challengerLeaderName:g.name,targetClan,targetTag:targetLeaderE.gameState.clanTag||'---',
+      targetLeader:targetLeaderE.username,status:'pending',createdAt:Date.now(),expiresAt:Date.now()+30*60*1000};
+    db.clanChallenges.push(ch);
+    saveDB(db);
+    sendSSE(targetLeaderE.username,'war_challenge',{challengeId:ch.id,challengerClan:g.clanName,
+      challengerTag:g.clanTag||'---',challengerLeaderName:g.name,expiresAt:ch.expiresAt});
+    send(res,200,{ok:true,challengeId:ch.id,msg:'Desafio enviado! Aguardando o lider do '+targetClan+' aceitar.'}); return;
+  }
+
+  // GET /api/clanwar/history — war history
   if (method === 'GET' && url === '/api/clanwar/history') {
     const db = loadDB();
-    if (!db.clanWars) { send(res, 200, { wars: [] }); return; }
-    send(res, 200, { wars: db.clanWars.filter(w=>w.status==='done').sort((a,b)=>b.resolvedAt-a.resolvedAt).slice(0,30) });
-    return;
+    if (!db.clanWars) { send(res,200,{wars:[]}); return; }
+    send(res,200,{wars:db.clanWars.filter(w=>w.status==='done').sort((a,b)=>b.resolvedAt-a.resolvedAt).slice(0,50)}); return;
   }
 
-  // Distribuir espolios
-  if (method === 'POST' && url === '/api/clanwar/distribute') {
-    const username = verifyToken(getToken(req));
-    if (!username) { send(res, 401, { error: 'Nao autenticado.' }); return; }
-    const { distributions } = await readBody(req);
-    if (!distributions||!Array.isArray(distributions)) { send(res, 400, { error: 'Distribuicoes necessarias.' }); return; }
+  // GET /api/clanwar/ranking — clan war ranking
+  if (method === 'GET' && url === '/api/clanwar/ranking') {
     const db = loadDB();
-    const lu = db.users[username];
-    if (!lu||!lu.gameState) { send(res, 400, { error: 'Personagem nao encontrado.' }); return; }
-    if (lu.gameState.clanRole!=='leader') { send(res, 403, { error: 'Apenas o lider pode distribuir.' }); return; }
-    const avail = lu.gameState.clanGold||0;
-    const total = distributions.reduce((s,d)=>s+(d.amount||0),0);
-    if (total>avail) { send(res, 400, { error: 'Ouro insuficiente. Disponivel: '+avail }); return; }
-    const myClan = lu.gameState.clanName;
-    distributions.forEach(d => {
-      if (!d.amount||d.amount<=0) return;
-      const tu = db.users[d.username];
-      if (!tu||!tu.gameState||tu.gameState.clanName!==myClan) return;
-      tu.gameState.gold = (tu.gameState.gold||0)+d.amount;
-      if (!tu.gameState.log) tu.gameState.log=[];
-      tu.gameState.log.unshift({ msg:'💰 Recebeu '+d.amount+' ouro do tesouro do cla!', cls:'good' });
-    });
-    lu.gameState.clanGold -= total;
+    const ranking = db.clanWarRanking || {};
+    const sorted = Object.entries(ranking)
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,20)
+      .map(([clan,wins],i) => {
+        const members = Object.values(db.users).filter(u=>u.gameState&&u.gameState.clanName===clan);
+        const tag = members.length ? (members[0].gameState.clanTag||'---') : '---';
+        return {rank:i+1, clan, tag, wins};
+      });
+    send(res,200,{ranking:sorted}); return;
+  }
+
+  // GET /api/clanwar/challenges — pending challenges for my clan
+  if (method === 'GET' && url === '/api/clanwar/challenges') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const myClan = user.gameState.clanName;
+    if (!db.clanChallenges) { send(res,200,{challenges:[]}); return; }
+    // Clean expired
+    db.clanChallenges = db.clanChallenges.filter(c=>c.expiresAt>Date.now()||c.status==='accepted'||c.status==='declined');
+    const challenges = db.clanChallenges.filter(c=>
+      c.status==='pending' && (c.challengerClan===myClan||c.targetClan===myClan)
+    );
     saveDB(db);
-    broadcastSSE('spoils_distributed', { clan: myClan, total });
-    send(res, 200, { ok:true, remaining: lu.gameState.clanGold });
-    return;
+    send(res,200,{challenges}); return;
   }
 
 
