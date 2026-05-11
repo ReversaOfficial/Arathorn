@@ -26,8 +26,10 @@ if (DATA_DIR !== __dirname) {
 const SECRET  = 'arathorn_secret_key_2024_change_in_production';
 
 // ADMIN — credentials for panel access
+// Admin credentials — change here directly OR set env vars on Railway
 const ADMIN_USER = process.env.ADMIN_USER || 'arathorn';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'Gael@admin1100';
+console.log('[ADMIN] Login:', ADMIN_USER, '/ senha: ' + ADMIN_PASS.slice(0,4) + '****');
 const ADMIN_PANEL_SECRET = process.env.ADMIN_PANEL_SECRET || 'arathorn_panel_2024';
 
 // Admin token store (survives requests, resets on server restart)
@@ -619,7 +621,24 @@ function getToken(req) {
 // POWER CALCULATION
 function calcPower(g) {
   if (!g) return 0;
-  return Math.round((g.level||1)*100 + ((g.stats&&g.stats.kills)||0)*2 + (g.str||10)*8 + (g.res||10)*6 + (g.mag||8)*4);
+  // Level is the PRIMARY driver of power (prevents low-lv high-stat exploits)
+  // Stats matter but level weight keeps the ranking meaningful
+  const lv    = (g.level||1);
+  const str   = (g.str||10);
+  const dex   = (g.dex||10);
+  const mag   = (g.mag||10);
+  const res   = (g.res||10);
+  const kills = ((g.stats&&g.stats.kills)||0);
+  const hp    = (g.hpMax||90);
+  return Math.round(
+    lv * 150          // level: main factor — lv difference matters a lot
+    + str * 6
+    + dex * 4
+    + mag * 4
+    + res * 5
+    + hp  * 0.5       // HP pool contributes
+    + kills * 1       // PvP kills: minor bonus
+  );
 }
 
 

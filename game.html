@@ -3125,6 +3125,45 @@ function getEffectiveStats() {
   };
 }
 
+
+// ══════════════════════════════════════════════════════════
+// POWER CALCULATION — single source of truth (mirrors server)
+// Level is the PRIMARY factor to prevent stat inflation bypasses
+// ══════════════════════════════════════════════════════════
+function calcPowerClient(g) {
+  if (!g) return 0;
+  const lv    = g.level  || 1;
+  const str   = g.str    || 10;
+  const dex   = g.dex    || 10;
+  const mag   = g.mag    || 10;
+  const res   = g.res    || 10;
+  const kills = (g.stats && g.stats.kills) || 0;
+  const hp    = g.hpMax  || 90;
+  return Math.round(
+    lv * 150
+    + str * 6
+    + dex * 4
+    + mag * 4
+    + res * 5
+    + hp  * 0.5
+    + kills * 1
+  );
+}
+
+// My own power (includes effective equip bonuses)
+function myPower() {
+  const eff = getEffectiveStats();
+  return Math.round(
+    (G.level||1) * 150
+    + eff.str * 6
+    + eff.dex * 4
+    + eff.mag * 4
+    + eff.res * 5
+    + eff.hpMax * 0.5
+    + ((G.stats&&G.stats.kills)||0) * 1
+  );
+}
+
 function updateUI() {
   const race = RACES[G.race] || RACES.humano;
   const icon = race.icon;
@@ -3252,7 +3291,7 @@ function updateUI() {
   se('p-kills', G.stats.kills||0);
   se('p-pvpwins', G.stats.pvpWins||0);
   se('p-warwins', G.stats.warWins||0);
-  const power = G.level*100 + (G.stats.kills||0)*2 + getEquipBonus('atk')*10 + getEquipBonus('def')*8;
+  const power = myPower();
   se('p-power', power);
   // Privacy toggle
   const privBtn = document.getElementById('privacy-toggle-btn');
@@ -4105,7 +4144,7 @@ async function renderClan() {
     se('clan-display-tag','['+(G.clanTag||'---')+']');
     const myRoleD = getRoleDisplay(G.clanRole, false);
     se('clan-my-rank', myRoleD.label);
-    const power = G.level*100 + (G.stats.kills||0);
+    const power = myPower();
     se('clan-power-display','Poder: '+power);
     se('clan-stat-wins', G.clanWins||0);
     se('clan-stat-gold', G.clanGold||0);
@@ -5293,7 +5332,7 @@ function startHeartbeat() {
   clearInterval(heartbeatTimer);
   async function beat() {
     if (!AUTH.token || !G.name) return;
-    const power = G.level*100 + (G.stats&&G.stats.kills||0)*2 + (G.str||10)*8 + (G.res||10)*6 + (G.mag||8)*4;
+    const power = calcPowerClient(G);
     await api('POST', '/api/heartbeat', { info: {
       name: G.name, race: G.race, level: G.level,
       power, clanName: G.clanName || null, username: AUTH.username
@@ -5316,7 +5355,7 @@ function updateOnlineList(players) {
   const RACES_ICONS = {elfo:'🧝',orc:'👹',anao:'⛏️',humano:'🧑‍⚔️',druida:'🌿',mago:'🧙'};
   el.innerHTML = others.map(p => {
     const icon = RACES_ICONS[p.race] || '👤';
-    const myPower = G.level*100+(G.stats&&G.stats.kills||0)*2+(G.str||10)*8+(G.res||10)*6+(G.mag||8)*4;
+    const myPower = myPower();
     const diff = p.power - myPower;
     const diffStr = diff > 0 ? '<span style="color:var(--red-light)">+'+diff+' poder</span>' : diff < 0 ? '<span style="color:var(--green-light)">'+diff+' poder</span>' : '<span style="color:var(--text-muted)">Poder igual</span>';
     return '<div class="online-player-row">'
@@ -7452,7 +7491,7 @@ async function renderTavernPlayers() {
     el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;font-style:italic;padding:16px;text-align:center">Nenhum herói na taverna no momento.</div>';
     return;
   }
-  const myPower = G.level*100 + (G.stats.kills||0)*2 + getEquipBonus('str')*10 + getEquipBonus('res')*8;
+  const myPower = myPower();
   const iKO = G.knockedOutUntil && G.knockedOutUntil > Date.now();
   const RICONS = {elfo:'🧝',orc:'👹',anao:'⛏️',humano:'🧑‍⚔️',druida:'🌿',mago:'🧙'};
 
@@ -7495,7 +7534,7 @@ async function renderTavernPlayers() {
 async function attackTavernPlayer(btn) {
   const targetUsername = btn.dataset.user;
   const targetName     = btn.dataset.name;
-  const myPower = G.level*100 + (G.stats.kills||0)*2 + getEquipBonus('str')*10 + getEquipBonus('res')*8;
+  const myPower = myPower();
 
   showModal(
     '⚔ Atacar ' + targetName + '?',
@@ -8822,7 +8861,7 @@ async function openGroupLobby(missionId) {
   const needed   = m.clanSize || 2;
   const isRaid   = m.type === 'raid';
   const isLeader = isRaid || G.clanRole === 'leader'; // raids: anyone can create
-  const myPower  = G.level*100 + ((G.stats&&G.stats.kills)||0)*2 + (G.str||10)*8 + (G.res||10)*6 + (G.mag||8)*4;
+  const myPower  = myPower();
 
   showModal(
     m.icon + ' ' + m.name,
