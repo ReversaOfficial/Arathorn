@@ -8889,63 +8889,99 @@ let _groupCombatCallback = null; // callback after group combat
 
 async function openGroupLobby(missionId) {
   if (isRestricted()) return;
-  if (!G.clanName) { toast('Você precisa de um clã!','bad'); return; }
-
   const m = MISSIONS.find(x => x.id === missionId);
   if (!m) return;
-
-  const needed   = m.clanSize || 2;
   const isRaid   = m.type === 'raid';
-  const isLeader = isRaid || G.clanRole === 'leader'; // raids: anyone can create
-  const myPower  = myPower();
+  const isLeader = isRaid || G.clanRole === 'leader';
 
+  if (!isLeader) {
+    toast('Aguarde seu líder de clã convocar a missão!', 'info');
+    return;
+  }
+  if (!G.clanName && !isRaid) {
+    toast('Você precisa de um clã para missões de clã!', 'bad');
+    return;
+  }
+  if (G.stam < m.stam) {
+    toast('⚡ Estamina insuficiente! ('+G.stam+'/'+m.stam+')', 'bad');
+    return;
+  }
+
+  // Load eligible online players
+  showModal(m.icon + ' ' + m.name, '<div style="text-align:center;padding:20px;color:var(--text-muted)">Buscando jogadores online...</div>', []);
+  const listRes = await api('GET', '/api/group/invite-list/'+missionId);
+  if (listRes.error) { closeModal(); toast(listRes.error,'bad'); return; }
+
+  const needed  = m.clanSize || 2;
+  const players = listRes.players || [];
+  const RICONS  = {elfo:'🧝',orc:'👹',anao:'⛏️',humano:'🧑‍⚔️',druida:'🌿',mago:'🧙'};
+
+  // Build invite selection modal
+  const playersHtml = players.length
+    ? players.map(p =>
+        '<label style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--radius);background:var(--bg-dark);margin-bottom:6px;cursor:pointer;border:1px solid var(--border);transition:.15s" '
+        +' var(--border)\'">'
+        + '<input type="checkbox" class="group-invite-check" data-user="'+p.username+'" data-name="'+p.name+'" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer">'
+        + '<span style="font-size:16px">'+(RICONS[p.race]||'👤')+'</span>'
+        + '<div style="flex:1">'
+        +   '<div style="font-size:13px;font-weight:500">'+p.name+'</div>'
+        +   '<div style="font-size:11px;color:var(--text-muted)">Nv.'+p.level+' · ⚡ '+p.power.toLocaleString()+(p.clanName?' · '+p.clanName:'')+'</div>'
+        + '</div>'
+        + '<span style="font-size:10px;color:var(--green-light)">● Online</span>'
+        +'</label>'
+      ).join('')
+    : '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">😔 Nenhum jogador online elegível no momento.</div>';
+
+  const infoHtml =
+    '<div style="background:var(--bg-dark);border-radius:var(--radius);padding:10px;margin-bottom:12px;font-size:12px">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    + '<div>👥 Mínimo: <b>'+needed+'</b> jogadores</div>'
+    + '<div>⚡ Cada: <b>-'+m.stam+'</b> estam</div>'
+    + '<div>💰 <b>'+m.gold[0].toLocaleString()+'–'+m.gold[1].toLocaleString()+'</b> ouro</div>'
+    + '<div>✨ <b>'+m.xp[0].toLocaleString()+'–'+m.xp[1].toLocaleString()+'</b> XP</div>'
+    + '</div>'
+    + '<div style="margin-top:6px;font-size:11px;color:var(--red-light)">💀 Falha = todos vão para a enfermaria</div>'
+    + '</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">'
+    + (isRaid ? '⚔ Selecione jogadores online para convidar para a raid:' : '🛡 Membros do clã online — selecione quem convidar:')
+    + '</div>'
+    + playersHtml;
+
+  closeModal();
   showModal(
     m.icon + ' ' + m.name,
-    '<div style="text-align:center">'
-    + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">'+m.desc+'</div>'
-    + '<div style="background:var(--bg-dark);border-radius:var(--radius);padding:12px;margin-bottom:12px;font-size:12px">'
-    +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-    +   '<div>👥 <b>'+needed+' jogadores</b> necessários</div>'
-    +   '<div>⚡ <b>-'+m.stam+'</b> estamina cada</div>'
-    +   '<div>💰 <b>'+m.gold[0].toLocaleString()+'–'+m.gold[1].toLocaleString()+'</b> ouro</div>'
-    +   '<div>✨ <b>'+m.xp[0].toLocaleString()+'–'+m.xp[1].toLocaleString()+'</b> XP</div>'
-    +   '</div>'
-    + '</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Seu poder: <b style="color:var(--gold)">⚡ '+myPower.toLocaleString()+'</b></div>'
-    + (G.stam < m.stam ? '<div style="color:var(--red-light);font-size:12px">⚡ Estamina insuficiente! ('+G.stam+'/'+m.stam+')</div>' : '')
-    + '<div style="font-size:12px;color:var(--text-muted);margin-top:8px">💀 Se a missão falhar, <b>todos</b> vão para a enfermaria!</div>'
-    + '</div>',
+    infoHtml,
     [
-      { label:'Cancelar', fn: closeModal },
-      ...(G.stam >= m.stam ? [{
-        label: isLeader
-          ? (isRaid ? '⚔ Convocar jogadores online' : '📢 Convocar clã')
-          : '🚪 Aguardar convite do líder',
+      { label: 'Cancelar', fn: closeModal },
+      {
+        label: '📢 Criar Sala e Convidar',
         cls: 'btn-gold',
         fn: async () => {
-          closeModal();
-          if (isLeader) {
-            await createGroupRoom(missionId);
-          } else {
-            toast('Aguarde seu líder do clã convocar a missão!', 'info');
+          // Get selected players
+          const checks = document.querySelectorAll('.group-invite-check:checked');
+          const invited = Array.from(checks).map(c => ({ username: c.dataset.user, name: c.dataset.name }));
+          if (invited.length === 0 && players.length > 0) {
+            toast('Selecione ao menos 1 jogador para convidar!', 'bad');
+            return;
           }
+          closeModal();
+          await createGroupRoom(missionId, invited);
         }
-      }] : [])
+      }
     ]
   );
 }
 
-async function createGroupRoom(missionId) {
+async function createGroupRoom(missionId, invitedPlayers) {
   const m = MISSIONS.find(x => x.id === missionId);
   const res = await api('POST', '/api/group/create', { missionId });
   if (res.error) { toast(res.error,'bad'); return; }
   _groupRoom = { id: res.roomId, missionId };
-  toast('📢 Sala criada! Membros do clã foram convidados.', 'good');
-  showGroupLobbyModal(res.roomId, m);
+  toast('📢 Sala criada! Convidando jogadores...', 'good');
+  showGroupLobbyModal(res.roomId, m, invitedPlayers || []);
 }
 
 async function findAndJoinGroupRoom(missionId) {
-  // For non-leaders: show a notice that leader must create the room
   toast('Aguarde seu líder convocar a missão!','info');
 }
 
@@ -8958,58 +8994,88 @@ async function joinGroupFromInvite(roomId, missionId) {
   showGroupLobbyModal(roomId, m);
 }
 
-function showGroupLobbyModal(roomId, m) {
+function showGroupLobbyModal(roomId, m, pendingInvites) {
   if (!m) return;
+  pendingInvites = pendingInvites || [];
   const needed = m.clanSize || 2;
 
-  // Fetch room state
   api('GET', '/api/group/room/'+roomId).then(res => {
     if (res.error || !res.room) { toast(res.error||'Sala não encontrada','bad'); return; }
-    const room = res.room;
+    const room     = res.room;
     const isLeader = room.leader === AUTH.username;
     const count    = room.members.length;
-    const canStart = count >= needed;
     const RICONS   = {elfo:'🧝',orc:'👹',anao:'⛏️',humano:'🧑‍⚔️',druida:'🌿',mago:'🧙'};
 
-    const membersHtml = room.members.map(m2 =>
-      '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+    // Members who accepted (in room)
+    const accepted = room.members || [];
+    // Pending: invited but not yet accepted
+    const acceptedNames = accepted.map(x => x.username);
+    const pending = pendingInvites.filter(p => !acceptedNames.includes(p.username));
+
+    // All accepted
+    const allAccepted = pending.length === 0 && count >= needed;
+    // Can start only if minimum met AND no one pending
+    const canStart = count >= needed && pending.length === 0;
+
+    const membersHtml = accepted.map(m2 =>
+      '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">'
       + '<span style="font-size:16px">'+(RICONS[m2.race]||'👤')+'</span>'
-      + '<div style="flex:1"><div style="font-size:13px">'+m2.name
-      +   (m2.username===AUTH.username?' <span style="font-size:10px;color:var(--text-muted)">(Você)</span>':'')
-      +   (m2.username===room.leader?' 👑':'')+'</div>'
-      + '<div style="font-size:11px;color:var(--text-muted)">Nv.'+m2.level+' · ⚡'+m2.power.toLocaleString()+'</div></div>'
-      + '<span style="color:var(--green-light);font-size:12px">✓</span>'
+      + '<div style="flex:1">'
+      +   '<div style="font-size:13px;font-weight:500">'+m2.name
+      +     (m2.username===AUTH.username?' <span style="font-size:10px;color:var(--text-muted)">(Você)</span>':'')
+      +     (m2.username===room.leader?' 👑':'')+'</div>'
+      +   '<div style="font-size:11px;color:var(--text-muted)">Nv.'+m2.level+' · ⚡'+m2.power.toLocaleString()+'</div>'
+      + '</div>'
+      + '<span style="color:var(--green-light);font-size:13px;font-weight:700">✓ Aceitou</span>'
       + '</div>'
     ).join('');
 
-    // Empty slots
-    const emptySlots = Array(Math.max(0, needed - count)).fill(0).map(() =>
-      '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);opacity:.4">'
+    const pendingHtml = pending.map(p =>
+      '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);opacity:.7">'
       + '<span style="font-size:16px">👤</span>'
-      + '<div style="flex:1;font-size:12px;color:var(--text-muted)">Aguardando...</div>'
+      + '<div style="flex:1">'
+      +   '<div style="font-size:13px">'+p.name+'</div>'
+      +   '<div style="font-size:11px;color:var(--text-muted)">Convite enviado...</div>'
+      + '</div>'
+      + '<span style="color:#d0a040;font-size:12px">⏳ Aguardando</span>'
       + '</div>'
     ).join('');
+
+    // Remaining empty slots (not counting pending)
+    const remaining = Math.max(0, needed - count - pending.length);
+    const emptyHtml = Array(remaining).fill(0).map(() =>
+      '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);opacity:.35">'
+      +'<span style="font-size:16px">👤</span>'
+      +'<div style="font-size:12px;color:var(--text-muted)">Vaga disponível</div>'
+      +'</div>'
+    ).join('');
+
+    const statusColor = canStart ? 'var(--green-light)' : pending.length ? '#d0a040' : 'var(--text-muted)';
+    const statusMsg   = canStart
+      ? '✅ Todos prontos! Pode iniciar.'
+      : pending.length
+        ? '⏳ Aguardando '+pending.length+' jogador(es) aceitar...'
+        : count+'/'+needed+' membros — aguardando mais jogadores';
 
     showModal(
-      m.icon + ' ' + m.name + ' — Sala',
+      m.icon + ' ' + m.name,
       '<div>'
-      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;text-align:center">'
-      +   count+'/'+needed+' membros'+(canStart?' — <span style="color:var(--green-light)">Pronto!</span>':' — Aguardando...')
+      + '<div style="text-align:center;font-size:12px;color:'+statusColor+';margin-bottom:12px;padding:8px;background:rgba(0,0,0,.3);border-radius:var(--radius)">'
+      +   statusMsg
       + '</div>'
-      + membersHtml + emptySlots
+      + membersHtml
+      + pendingHtml
+      + emptyHtml
       + '</div>',
       [
-        { label:'Sair da Sala', fn: async () => {
+        { label: isLeader ? '✕ Cancelar Sala' : '← Sair da Sala', fn: async () => {
           closeModal();
           await api('POST', '/api/group/leave', { roomId });
           _groupRoom = null;
-          toast('Saiu da sala.','info');
+          toast(isLeader ? 'Sala cancelada.' : 'Saiu da sala.','info');
         }},
-        ...((canStart && (room.isRaid || m.type === 'raid'
-          ? room.members.find(mb => mb.username === AUTH.username)  // raid: anyone
-          : room.leader === AUTH.username)                           // clan: leader only
-        ) ? [{
-          label: '⚔ INICIAR!', cls:'btn-red',
+        ...(isLeader && canStart ? [{
+          label: '⚔ INICIAR MISSÃO!', cls:'btn-red',
           fn: async () => {
             closeModal();
             const r2 = await api('POST', '/api/group/start', { roomId });
@@ -9017,9 +9083,10 @@ function showGroupLobbyModal(roomId, m) {
             startGroupCombat(roomId, m);
           }
         }] : [])
-      ],
-      true // keep open
+      ]
     );
+    // Store pending for when room_update arrives
+    _groupRoom = { id: roomId, missionId: m.id, pendingInvites: pendingInvites };
   });
 }
 
@@ -9070,10 +9137,12 @@ function registerGroupSSEHandlers() {
     const d = JSON.parse(e.data);
     if (_groupRoom && _groupRoom.id === d.room.id) {
       const m = MISSIONS.find(x => x.id == d.room.missionId);
-      if (m) showGroupLobbyModal(d.room.id, m);
+      const pending = (_groupRoom && _groupRoom.pendingInvites) || [];
+      if (m) showGroupLobbyModal(d.room.id, m, pending);
     }
-    const who = d.room.members[d.room.members.length-1];
-    if (who && who.username !== AUTH.username) toast('👤 '+who.name+' entrou na sala!','info');
+    const members = d.room.members || [];
+    const who = members[members.length-1];
+    if (who && who.username !== AUTH.username) toast('✅ '+who.name+' aceitou e entrou na sala!','good');
   });
 
   // Mission started (non-leader members)

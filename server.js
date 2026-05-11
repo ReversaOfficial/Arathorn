@@ -3578,6 +3578,32 @@ async function handleRequest(req, res) {
     send(res,200,{ ok:true, count, totalGold, removed }); return;
   }
 
+
+  // GET /api/group/invite-list/:missionId — get online players eligible for this mission
+  if (method === 'GET' && url.startsWith('/api/group/invite-list/')) {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const missionId = parseInt(url.split('/').pop()) || 0;
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+    const isRaid = [49,50,51,52].includes(missionId);
+    const players = getOnlinePlayers().filter(p => {
+      if (p.username === username) return false; // exclude self
+      if (isRaid) return true; // raids: all online
+      return p.clanName === g.clanName; // clan missions: clanmates only
+    }).map(p => ({
+      username: p.username,
+      name:     p.name,
+      race:     p.race,
+      level:    p.level,
+      power:    p.power,
+      clanName: p.clanName,
+    }));
+    send(res,200,{players}); return;
+  }
+
   send(res, 404, { error: 'Endpoint nao encontrado.' });
 }
 
