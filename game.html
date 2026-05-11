@@ -3150,18 +3150,10 @@ function calcPowerClient(g) {
   );
 }
 
-// My own power (includes effective equip bonuses)
+// My own power — uses same formula as server and ranking (base stats only)
+// This ensures profile, ranking, taverna and HUD all show identical values
 function myPower() {
-  const eff = getEffectiveStats();
-  return Math.round(
-    (G.level||1) * 150
-    + eff.str * 6
-    + eff.dex * 4
-    + eff.mag * 4
-    + eff.res * 5
-    + eff.hpMax * 0.5
-    + ((G.stats&&G.stats.kills)||0) * 1
-  );
+  return calcPowerClient(G);
 }
 
 function updateUI() {
@@ -7538,7 +7530,7 @@ async function renderTavernPlayers() {
           : iKO
             ? '<span class="badge badge-red" style="font-size:10px">Você está KO</span>'
             : (() => {
-                const myPwr  = G.level*100 + ((G.stats&&G.stats.kills)||0)*2 + (G.str||10)*8 + (G.res||10)*6 + (G.mag||8)*4;
+                const myPwr  = calcPowerClient(G); // unified formula
                 const hisPwr = p.power || 0;
                 const tooWeakMe   = myPwr  < 300;
                 const tooWeakThem = hisPwr < 300;
