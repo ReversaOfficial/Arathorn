@@ -140,9 +140,31 @@ tr.sel td{background:rgba(201,168,76,.09)}
           <div class="info-r">Usuário: <span id="i-user">—</span></div>
           <div class="info-r">Criado: <span id="i-created">—</span></div>
           <div class="info-r">Último login: <span id="i-login">—</span></div>
+          <div class="info-r">Poder: <span id="i-power">—</span></div>
+          <div class="info-r">Raça: <span id="i-race">—</span></div>
+          <div class="info-r">Clã: <span id="i-clan">—</span></div>
+          <div class="info-r">Zona: <span id="i-zone">—</span></div>
           <div class="info-r">Missões: <span id="i-missions">—</span></div>
-          <div class="info-r">PvP Wins: <span id="i-pvp">—</span></div>
+          <div class="info-r">PvP ✓/✗: <span id="i-pvp">—</span></div>
+          <div class="info-r">Crimes: <span id="i-crimes">—</span></div>
           <div class="info-r">VIP expira: <span id="i-vip">—</span></div>
+          <div class="info-r" id="i-jail-row" style="color:#ff9090;display:none">🔒 Preso até: <span id="i-jail">—</span></div>
+          <div class="info-r" id="i-ko-row" style="color:#ff9090;display:none">🏥 KO até: <span id="i-ko">—</span></div>
+        </div>
+
+        <div class="sec" id="sec-equip">
+          <h3>⚔ Equipamentos</h3>
+          <div id="i-equipment" style="font-size:11px;line-height:1.8"></div>
+        </div>
+
+        <div class="sec" id="sec-inv">
+          <h3>🎒 Inventário <span id="i-inv-count" style="color:var(--text2);font-weight:400"></span></h3>
+          <div id="i-inventory" style="font-size:11px;line-height:1.8;max-height:120px;overflow-y:auto"></div>
+        </div>
+
+        <div class="sec" id="sec-friends">
+          <h3>👥 Amigos <span id="i-friends-count" style="color:var(--text2);font-weight:400"></span></h3>
+          <div id="i-friends" style="font-size:11px;color:var(--text2)"></div>
         </div>
 
         <div class="sec">
@@ -337,13 +359,51 @@ function select(username) {
   document.getElementById('i-user').textContent      = SEL.username;
   document.getElementById('i-created').textContent   = fmtD(SEL.createdAt);
   document.getElementById('i-login').textContent     = fmtD(SEL.lastLogin);
+  document.getElementById('i-power').textContent     = (SEL.power||0).toLocaleString() + ' ⚡';
+  document.getElementById('i-race').textContent      = (RICON[SEL.race]||'👤') + ' ' + (SEL.race||'—');
+  document.getElementById('i-clan').textContent      = SEL.clanName !== '—' ? '['+SEL.clanTag+'] '+SEL.clanName+' ('+SEL.clanRole+')' : 'Sem clã';
+  document.getElementById('i-zone').textContent      = SEL.currentZone || '—';
   document.getElementById('i-missions').textContent  = SEL.missions || 0;
-  document.getElementById('i-pvp').textContent       = SEL.pvpWins  || 0;
+  document.getElementById('i-pvp').textContent       = (SEL.pvpWins||0) + ' vitórias / ' + (SEL.pvpLosses||0) + ' derrotas';
+  document.getElementById('i-crimes').textContent    = SEL.crimes || 0;
   document.getElementById('i-gold').textContent      = (SEL.gold || 0).toLocaleString();
   const vip = SEL.vipUntil > Date.now();
   document.getElementById('i-vip').textContent = vip
     ? new Date(SEL.vipUntil).toLocaleString('pt-BR') + ' (ativo)'
     : 'Sem VIP';
+  // Jail/KO status
+  const jailRow = document.getElementById('i-jail-row');
+  const koRow   = document.getElementById('i-ko-row');
+  if (SEL.jailUntil > Date.now()) {
+    jailRow.style.display = '';
+    document.getElementById('i-jail').textContent = new Date(SEL.jailUntil).toLocaleTimeString('pt-BR');
+  } else { jailRow.style.display = 'none'; }
+  if (SEL.knockedOutUntil > Date.now()) {
+    koRow.style.display = '';
+    document.getElementById('i-ko').textContent = new Date(SEL.knockedOutUntil).toLocaleTimeString('pt-BR');
+  } else { koRow.style.display = 'none'; }
+  // Equipment
+  const SLOT_LABELS = {weapon:'⚔ Arma',helmet:'⛑️ Elmo',armor:'🧥 Armadura',pants:'👖 Calças',
+    gloves:'🧤 Luvas',boots:'👢 Botas',shield:'🛡 Escudo',ring:'💍 Anel',earring:'📿 Brinco'};
+  const equip = SEL.equipment || {};
+  const eqHtml = Object.entries(SLOT_LABELS).map(([slot, label]) => {
+    const id = equip[slot];
+    return '<div style="display:flex;gap:4px;padding:2px 0">'
+      + '<span style="color:var(--text2);min-width:80px">' + label + ':</span>'
+      + '<span style="color:' + (id ? 'var(--text)' : 'var(--text3)') + '">' + (id || '—') + '</span>'
+      + '</div>';
+  }).join('');
+  document.getElementById('i-equipment').innerHTML = eqHtml;
+  // Inventory
+  const inv = SEL.inventory || [];
+  document.getElementById('i-inv-count').textContent = '(' + inv.length + ' itens)';
+  document.getElementById('i-inventory').innerHTML = inv.length
+    ? inv.map(id => '<span style="background:var(--bg3);padding:1px 5px;border-radius:3px;margin:1px;display:inline-block">' + id + '</span>').join('')
+    : '<span style="color:var(--text3)">Vazio</span>';
+  // Friends
+  const friends = SEL.friends || [];
+  document.getElementById('i-friends-count').textContent = '(' + friends.length + ')';
+  document.getElementById('i-friends').textContent = friends.length ? friends.join(', ') : 'Nenhum';
   // Attr inputs
   const fields = { level: SEL.level, xp: SEL.xp, hp: SEL.hp, hpmax: SEL.hpMax,
                    str: SEL.str, dex: SEL.dex, mag: SEL.mag, res: SEL.res,

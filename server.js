@@ -27,7 +27,7 @@ const SECRET  = 'arathorn_secret_key_2024_change_in_production';
 
 // ADMIN — credentials for panel access
 const ADMIN_USER = process.env.ADMIN_USER || 'arathorn';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'A1bc3@admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'Gael@admin1100';
 const ADMIN_PANEL_SECRET = process.env.ADMIN_PANEL_SECRET || 'arathorn_panel_2024';
 
 // Admin token store (survives requests, resets on server restart)
@@ -2909,29 +2909,53 @@ async function handleRequest(req, res) {
     const users = Object.entries(db.users).map(([u, d]) => {
       const g = d.gameState;
       return {
-        username: u,
-        name:     g ? g.name    : '—',
-        level:    g ? g.level   : 0,
-        xp:       g ? g.xp     : 0,
-        gold:     g ? g.gold    : 0,
-        str:      g ? g.str     : 0,
-        dex:      g ? g.dex     : 0,
-        mag:      g ? g.mag     : 0,
-        res:      g ? g.res     : 0,
-        hp:       g ? g.hp      : 0,
-        hpMax:    g ? g.hpMax   : 0,
-        stam:     g ? g.stam    : 0,
-        stamMax:  g ? g.stamMax : 0,
-        race:     g ? g.race    : '—',
-        clanName: g ? (g.clanName||'—') : '—',
-        vipUntil: g ? (g.vipUntil||0)   : 0,
-        pvpWins:  g ? ((g.stats&&g.stats.pvpWins)||0) : 0,
-        missions: g ? ((g.stats&&g.stats.missions)||0) : 0,
+        username:  u,
+        email:     d.email || null,
+        name:      g ? g.name    : '—',
+        level:     g ? g.level   : 0,
+        xp:        g ? g.xp      : 0,
+        xpNext:    g ? g.xpNext  : 0,
+        gold:      g ? g.gold    : 0,
+        str:       g ? g.str     : 0,
+        dex:       g ? g.dex     : 0,
+        mag:       g ? g.mag     : 0,
+        res:       g ? g.res     : 0,
+        hp:        g ? g.hp      : 0,
+        hpMax:     g ? g.hpMax   : 0,
+        stam:      g ? g.stam    : 0,
+        stamMax:   g ? g.stamMax : 0,
+        mana:      g ? g.mana    : 0,
+        manaMax:   g ? g.manaMax : 0,
+        race:      g ? g.race    : '—',
+        clanName:  g ? (g.clanName||'—')  : '—',
+        clanRole:  g ? (g.clanRole||'—')  : '—',
+        clanTag:   g ? (g.clanTag||'—')   : '—',
+        vipUntil:  g ? (g.vipUntil||0)    : 0,
+        pvpWins:   g ? ((g.stats&&g.stats.pvpWins)||0)   : 0,
+        pvpLosses: g ? ((g.stats&&g.stats.pvpLosses)||0) : 0,
+        missions:  g ? ((g.stats&&g.stats.missions)||0)  : 0,
+        crimes:    g ? ((g.stats&&g.stats.crimes)||0)    : 0,
+        kills:     g ? ((g.stats&&g.stats.kills)||0)     : 0,
         createdAt: d.createdAt || 0,
         lastLogin: d.lastLogin  || 0,
         online:    onlineMap.has(u),
         hasChar:   !!g,
+        banned:    !!d.banned,
         isServerAssassin: g ? !!g.isServerAssassin : false,
+        jailUntil:        g ? (g.jailUntil||0)        : 0,
+        knockedOutUntil:  g ? (g.knockedOutUntil||0)  : 0,
+        // Full equipment — slot: itemId
+        equipment:   g ? (g.equipment||{})   : {},
+        // Inventory list
+        inventory:   g ? (g.inventory||[])   : [],
+        // Consumables
+        consumables: g ? (g.consumables||[]) : [],
+        // Friends
+        friends:     g ? (g.friends||[])     : [],
+        // Zone
+        currentZone: g ? (g.currentZone||'mirkwood') : 'mirkwood',
+        // Power
+        power: g ? calcPower(g) : 0,
       };
     }).sort((a,b) => b.level - a.level);
     send(res, 200, { users, total: users.length }); return;
