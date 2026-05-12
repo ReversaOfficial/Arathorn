@@ -2971,20 +2971,328 @@ const ALCH_ITEMS = [
   {id:'p7',icon:'🏃', name:'Elixir de Destreza',  type:'buff',buff:'dex',val:6, dur:3,price:45,desc:'+6 Destreza por 3 missões'},
   {id:'p8',icon:'🛡️', name:'Poção de Proteção',   type:'buff',buff:'res',val:10,dur:5,price:60,desc:'+10 Resistência por 5 missões'},
 ];
+
+// ═══════════════════════════════════════════════════════════════════════
+// ACHIEVEMENT SYSTEM — Com prêmios e Set Exclusivo do Vazio
+// ═══════════════════════════════════════════════════════════════════════
+//
+// SET EXCLUSIVO "ARAUTO DO VAZIO" (exclusivo conquistas — qualquer classe):
+//   ach_void_weapon  → 10.000 raids       → Lâmina do Vazio (weapon)
+//   ach_void_helmet  → 10.000 missões     → Elmo do Vazio   (helmet)
+//   ach_void_armor   → 5.000 kills PvP    → Armadura do Vazio(armor)
+//   ach_void_boots   → 10.000 crimes      → Botas do Vazio  (boots)
+//   ach_void_gloves  → 5.000 guerras clã  → Luvas do Vazio  (gloves)
+//   ach_void_ring    → 1M de ouro acum    → Anel do Vazio   (ring)
+//
+// Stats do Set (cada peça — MUITO forte, qualquer classe):
+//   STR+120 DEX+100 MAG+100 RES+120 HP+500 STAM+25 ATK+200 DEF+180
+// ═══════════════════════════════════════════════════════════════════════
+
+const VOID_SET_ITEMS = {
+  void_weapon: {
+    id:'void_weapon',icon:'🌌',name:'Lâmina do Vazio',slot:'weapon',class:null,
+    str:120,dex:100,mag:100,res:120,hp:500,atk:200,def:0,stam:25,
+    grade:'legendary',price:0,minLv:1,
+    desc:'STR+120 DEX+100 MAG+100 RES+120 HP+500 ATK+200 STAM+25 — Exclusivo Conquista'
+  },
+  void_helmet: {
+    id:'void_helmet',icon:'🌑',name:'Elmo do Vazio',slot:'helmet',class:null,
+    str:80,dex:80,mag:80,res:120,hp:600,def:180,stam:20,
+    grade:'legendary',price:0,minLv:1,
+    desc:'RES+120 DEF+180 HP+600 STR+80 DEX+80 MAG+80 STAM+20 — Exclusivo Conquista'
+  },
+  void_armor: {
+    id:'void_armor',icon:'🕳️',name:'Armadura do Vazio',slot:'armor',class:null,
+    str:100,res:150,hp:800,def:220,stam:20,
+    grade:'legendary',price:0,minLv:1,
+    desc:'RES+150 DEF+220 HP+800 STR+100 STAM+20 — Exclusivo Conquista'
+  },
+  void_boots: {
+    id:'void_boots',icon:'👣',name:'Botas do Vazio',slot:'boots',class:null,
+    dex:130,mag:80,res:80,hp:400,def:120,stam:30,
+    grade:'legendary',price:0,minLv:1,
+    desc:'DEX+130 DEF+120 HP+400 MAG+80 RES+80 STAM+30 — Exclusivo Conquista'
+  },
+  void_gloves: {
+    id:'void_gloves',icon:'🖤',name:'Luvas do Vazio',slot:'gloves',class:null,
+    str:110,dex:110,mag:110,res:80,hp:300,atk:150,stam:15,
+    grade:'legendary',price:0,minLv:1,
+    desc:'STR+110 DEX+110 MAG+110 ATK+150 HP+300 STAM+15 — Exclusivo Conquista'
+  },
+  void_ring: {
+    id:'void_ring',icon:'💠',name:'Anel do Vazio',slot:'ring',class:null,
+    str:80,dex:80,mag:150,res:80,hp:400,mana:300,stam:50,
+    grade:'legendary',price:0,minLv:1,
+    desc:'MAG+150 STAM+50 MANA+300 HP+400 STR+80 DEX+80 RES+80 — Exclusivo Conquista'
+  },
+};
+
+// Register void set items so findItem() can find them
+Object.values(VOID_SET_ITEMS).forEach(it => {
+  // Add to all item lookups
+  if (!window._voidSetRegistered) {
+    Object.values(VOID_SET_ITEMS).forEach(vi => {
+      if (!SHOP_ITEMS._void) SHOP_ITEMS._void = [];
+      SHOP_ITEMS._void.push(vi);
+    });
+    window._voidSetRegistered = true;
+  }
+});
+
 const ACHIEVEMENTS = [
-  {id:'first_mission',icon:'⚔️',name:'Primeira Sangria',  desc:'Complete sua primeira missão',req:(g)=>g.stats.missions>=1},
-  {id:'kill_10',      icon:'💀',name:'Caçador',            desc:'Derrote 10 inimigos',         req:(g)=>g.stats.kills>=10},
-  {id:'kill_100',     icon:'🔪',name:'Exterminador',       desc:'Derrote 100 inimigos',        req:(g)=>g.stats.kills>=100},
-  {id:'level_5',      icon:'⭐',name:'Herói Aprendiz',     desc:'Chegue ao nível 5',           req:(g)=>g.level>=5},
-  {id:'level_10',     icon:'🌟',name:'Herói Experiente',   desc:'Chegue ao nível 10',          req:(g)=>g.level>=10},
-  {id:'level_20',     icon:'✨',name:'Herói Lendário',     desc:'Chegue ao nível 20',          req:(g)=>g.level>=20},
-  {id:'rich_500',     icon:'⬡', name:'Homem de Posses',    desc:'Acumule 500 de ouro',         req:(g)=>g.gold>=500},
-  {id:'rich_5000',    icon:'💰',name:'Senhor da Fortuna',  desc:'Acumule 5000 de ouro',        req:(g)=>g.gold>=5000},
-  {id:'clan_join',    icon:'🛡️',name:'Irmão de Clã',       desc:'Entre ou funde um clã',       req:(g)=>!!g.clanName},
-  {id:'buy_item',     icon:'🛒',name:'Equipado',           desc:'Compre seu primeiro item',    req:(g)=>g.inventory.length>=1},
-  {id:'first_crime',  icon:'🎭',name:'Ladrão Iniciante',   desc:'Cometa seu primeiro crime',   req:(g)=>g.stats.crimes>=1},
-  {id:'missions_50',  icon:'🏆',name:'Veterano',           desc:'Complete 50 missões',         req:(g)=>g.stats.missions>=50},
+  // ── CATEGORIA: MISSÕES ──────────────────────────────────────────────────────
+  {id:'mission_1',   cat:'missoes', icon:'⚔️', name:'Primeira Missão',      tier:1, desc:'Complete 1 missão',
+   req:(g)=>g.stats.missions>=1,
+   reward:{gold:100, xp:50, msg:'Bem-vindo, aventureiro!'}},
+
+  {id:'mission_10',  cat:'missoes', icon:'⚔️', name:'Caçador Iniciante',    tier:1, desc:'Complete 10 missões',
+   req:(g)=>g.stats.missions>=10,
+   reward:{gold:500, xp:300, msg:'Você já provou seu valor!'}},
+
+  {id:'mission_50',  cat:'missoes', icon:'🏅', name:'Veterano de Campo',    tier:1, desc:'Complete 50 missões',
+   req:(g)=>g.stats.missions>=50,
+   reward:{gold:3000, xp:2000, consumables:['prist_s','prist_s'], msg:'Meio caminho andado.'}},
+
+  {id:'mission_100', cat:'missoes', icon:'🏅', name:'Centurião',            tier:2, desc:'Complete 100 missões',
+   req:(g)=>g.stats.missions>=100,
+   reward:{gold:10000, xp:8000, consumables:['prist_s','prist_s','prist_s'], msg:'100 batalhas vencidas!'}},
+
+  {id:'mission_250', cat:'missoes', icon:'🥈', name:'Guerreiro Implacável', tier:2, desc:'Complete 250 missões',
+   req:(g)=>g.stats.missions>=250,
+   reward:{gold:30000, xp:25000, consumables:['prist_m','prist_m'], msg:'Seu nome ressoa pelos campos de batalha.'}},
+
+  {id:'mission_500', cat:'missoes', icon:'🥇', name:'Lenda Viva',           tier:3, desc:'Complete 500 missões',
+   req:(g)=>g.stats.missions>=500,
+   reward:{gold:100000, xp:80000, consumables:['prist_m','prist_m','prist_m'], items:['re3'], msg:'500 missões completadas. Você é uma lenda.'}},
+
+  {id:'mission_1000',cat:'missoes', icon:'💠', name:'Mestre das Batalhas',  tier:3, desc:'Complete 1.000 missões',
+   req:(g)=>g.stats.missions>=1000,
+   reward:{gold:350000, xp:300000, consumables:['ravika_s','ravika_s','prist_m','prist_m','prist_m'],
+   items:['ran3'], msg:'1.000 missões! Seu lendário.'}},
+
+  {id:'mission_2000',cat:'missoes', icon:'💎', name:'Ceifador Eterno',      tier:4, desc:'Complete 2.000 missões',
+   req:(g)=>g.stats.missions>=2000,
+   reward:{gold:1200000, xp:1000000, consumables:['ravika_s','ravika_s','ravika_s'],
+   items:['ew3_epc','ew3_epc'], msg:'2.000 missões! Você ultrapassou os limites mortais.'}},
+
+  {id:'mission_3000',cat:'missoes', icon:'👑', name:'O Eterno Combatente',  tier:4, desc:'Complete 3.000 missões',
+   req:(g)=>g.stats.missions>=3000,
+   reward:{gold:3000000, xp:2500000, consumables:['ravika_m','ravika_m'],
+   items:['ew3_epc','ew3_epc','ew3_epc'], msg:'3.000 missões! Sua saga será contada por gerações.'}},
+
+  {id:'mission_5000',cat:'missoes', icon:'🌟', name:'Semideus das Batalhas', tier:5, desc:'Complete 5.000 missões',
+   req:(g)=>g.stats.missions>=5000,
+   reward:{gold:10000000, xp:8000000, consumables:['ravika_m','ravika_m','ravika_m'],
+   voidPiece:'void_helmet', msg:'5.000 missões! O Elmo do Vazio é seu!'}},
+
+  {id:'mission_10000',cat:'missoes',icon:'🌌', name:'O Eterno da Guerra',   tier:5, desc:'Complete 10.000 missões — LENDÁRIO',
+   req:(g)=>g.stats.missions>=10000,
+   reward:{gold:50000000, xp:40000000, consumables:['ravika_m','ravika_m','ravika_m','ravika_m'],
+   voidPiece:'void_helmet', msg:'10.000 MISSÕES! Você é eterno. O Elmo do Vazio Supremo é seu!'}},
+
+  // ── CATEGORIA: INIMIGOS MORTOS ──────────────────────────────────────────────
+  {id:'kill_10',   cat:'kills', icon:'💀', name:'Caçador',        tier:1, desc:'Derrote 10 inimigos',
+   req:(g)=>g.stats.kills>=10,
+   reward:{gold:200, xp:100}},
+
+  {id:'kill_100',  cat:'kills', icon:'🔪', name:'Exterminador',   tier:1, desc:'Derrote 100 inimigos',
+   req:(g)=>g.stats.kills>=100,
+   reward:{gold:2000, xp:1500, consumables:['prist_s']}},
+
+  {id:'kill_500',  cat:'kills', icon:'⚔️', name:'Ceifador',       tier:2, desc:'Derrote 500 inimigos',
+   req:(g)=>g.stats.kills>=500,
+   reward:{gold:15000, xp:12000, consumables:['prist_s','prist_s','prist_s']}},
+
+  {id:'kill_2000', cat:'kills', icon:'🩸', name:'Banho de Sangue', tier:3, desc:'Derrote 2.000 inimigos',
+   req:(g)=>g.stats.kills>=2000,
+   reward:{gold:80000, xp:65000, consumables:['prist_m','prist_m'], items:['rm1']}},
+
+  {id:'kill_5000', cat:'kills', icon:'💀', name:'Aniquilador',    tier:3, desc:'Derrote 5.000 inimigos',
+   req:(g)=>g.stats.kills>=5000,
+   reward:{gold:300000, xp:250000, consumables:['prist_m','prist_m','prist_m'], items:['rm2']}},
+
+  {id:'kill_10000',cat:'kills', icon:'🔱', name:'Flagelo dos Reinos', tier:4, desc:'Derrote 10.000 inimigos',
+   req:(g)=>g.stats.kills>=10000,
+   reward:{gold:1000000, xp:800000, consumables:['ravika_s','ravika_s'],
+   items:['rm3'], msg:'10.000 mortes! Seu nome é terror nos reinos.'}},
+
+  {id:'kill_50000',cat:'kills', icon:'🌑', name:'A Morte Encarnada', tier:5, desc:'Derrote 50.000 inimigos',
+   req:(g)=>g.stats.kills>=50000,
+   reward:{gold:10000000, xp:8000000, consumables:['ravika_m','ravika_m','ravika_m'],
+   voidPiece:'void_weapon', msg:'50.000 mortes! A Lâmina do Vazio reconhece seu dono.'}},
+
+  // ── CATEGORIA: PvP ──────────────────────────────────────────────────────────
+  {id:'pvp_1',    cat:'pvp', icon:'⚔️', name:'Primeiro Duelo',     tier:1, desc:'Vença 1 duelo PvP',
+   req:(g)=>g.stats.pvpWins>=1,
+   reward:{gold:500, xp:300}},
+
+  {id:'pvp_10',   cat:'pvp', icon:'🥊', name:'Duelista',           tier:1, desc:'Vença 10 duelos PvP',
+   req:(g)=>g.stats.pvpWins>=10,
+   reward:{gold:5000, xp:4000, consumables:['prist_s','prist_s']}},
+
+  {id:'pvp_50',   cat:'pvp', icon:'🏆', name:'Gladiador',          tier:2, desc:'Vença 50 duelos PvP',
+   req:(g)=>g.stats.pvpWins>=50,
+   reward:{gold:30000, xp:25000, consumables:['prist_m'], items:['re1']}},
+
+  {id:'pvp_200',  cat:'pvp', icon:'👊', name:'Campeão da Arena',   tier:3, desc:'Vença 200 duelos PvP',
+   req:(g)=>g.stats.pvpWins>=200,
+   reward:{gold:200000, xp:160000, consumables:['prist_m','prist_m'], items:['re2']}},
+
+  {id:'pvp_1000', cat:'pvp', icon:'💀', name:'Flagelo dos Duelistas', tier:4, desc:'Vença 1.000 duelos PvP',
+   req:(g)=>g.stats.pvpWins>=1000,
+   reward:{gold:2000000, xp:1600000, consumables:['ravika_s','ravika_s','ravika_s'],
+   items:['re3'], msg:'1.000 vitórias em duelo! Lendário.'}},
+
+  {id:'pvp_5000', cat:'pvp', icon:'🌌', name:'Senhor dos Duelos',   tier:5, desc:'Vença 5.000 duelos PvP',
+   req:(g)=>g.stats.pvpWins>=5000,
+   reward:{gold:15000000, xp:12000000, consumables:['ravika_m','ravika_m','ravika_m'],
+   voidPiece:'void_armor', msg:'5.000 vitórias! A Armadura do Vazio reconhece o campeão.'}},
+
+  // ── CATEGORIA: CRIMES ───────────────────────────────────────────────────────
+  {id:'crime_1',    cat:'crimes', icon:'🎭', name:'Ladrão Iniciante',  tier:1, desc:'Cometa 1 crime',
+   req:(g)=>g.stats.crimes>=1,
+   reward:{gold:300, xp:200}},
+
+  {id:'crime_50',   cat:'crimes', icon:'🗡️', name:'Gatuno',            tier:1, desc:'Cometa 50 crimes',
+   req:(g)=>g.stats.crimes>=50,
+   reward:{gold:10000, xp:8000, consumables:['prist_s','prist_s']}},
+
+  {id:'crime_200',  cat:'crimes', icon:'🎪', name:'Ladrão Profissional', tier:2, desc:'Cometa 200 crimes',
+   req:(g)=>g.stats.crimes>=200,
+   reward:{gold:60000, xp:50000, consumables:['prist_m'], items:['ra1']}},
+
+  {id:'crime_1000', cat:'crimes', icon:'🦹', name:'Senhor do Submundo', tier:3, desc:'Cometa 1.000 crimes',
+   req:(g)=>g.stats.crimes>=1000,
+   reward:{gold:500000, xp:400000, consumables:['prist_m','prist_m','prist_m'], items:['ra2']}},
+
+  {id:'crime_5000', cat:'crimes', icon:'👁️', name:'A Sombra Eterna',   tier:4, desc:'Cometa 5.000 crimes',
+   req:(g)=>g.stats.crimes>=5000,
+   reward:{gold:5000000, xp:4000000, consumables:['ravika_s','ravika_s'],
+   items:['ra3'], msg:'5.000 crimes! Você domina as sombras.'}},
+
+  {id:'crime_10000',cat:'crimes', icon:'🌌', name:'O Crime Perfeito',   tier:5, desc:'Cometa 10.000 crimes',
+   req:(g)=>g.stats.crimes>=10000,
+   reward:{gold:20000000, xp:16000000, consumables:['ravika_m','ravika_m','ravika_m'],
+   voidPiece:'void_boots', msg:'10.000 crimes! As Botas do Vazio são suas.'}},
+
+  // ── CATEGORIA: NÍVEL ────────────────────────────────────────────────────────
+  {id:'level_5',   cat:'nivel', icon:'⭐', name:'Herói Aprendiz',    tier:1, desc:'Chegue ao nível 5',
+   req:(g)=>g.level>=5,   reward:{gold:500, xp:0}},
+
+  {id:'level_10',  cat:'nivel', icon:'🌟', name:'Herói Experiente',  tier:1, desc:'Chegue ao nível 10',
+   req:(g)=>g.level>=10,  reward:{gold:2000, xp:0, consumables:['prist_s']}},
+
+  {id:'level_25',  cat:'nivel', icon:'✨', name:'Guerreiro',         tier:2, desc:'Chegue ao nível 25',
+   req:(g)=>g.level>=25,  reward:{gold:10000, xp:0, consumables:['prist_s','prist_s']}},
+
+  {id:'level_50',  cat:'nivel', icon:'💫', name:'Elite',             tier:2, desc:'Chegue ao nível 50',
+   req:(g)=>g.level>=50,  reward:{gold:50000, xp:0, consumables:['prist_m']}},
+
+  {id:'level_100', cat:'nivel', icon:'🏆', name:'Centurião Lendário', tier:3, desc:'Chegue ao nível 100',
+   req:(g)=>g.level>=100, reward:{gold:200000, xp:0, consumables:['prist_m','prist_m'], items:['re2']}},
+
+  {id:'level_200', cat:'nivel', icon:'💎', name:'Semideus',          tier:4, desc:'Chegue ao nível 200',
+   req:(g)=>g.level>=200, reward:{gold:1000000, xp:0, consumables:['ravika_s','ravika_s'], items:['re3']}},
+
+  {id:'level_500', cat:'nivel', icon:'🌌', name:'Imortal',           tier:5, desc:'Chegue ao nível 500',
+   req:(g)=>g.level>=500, reward:{gold:10000000, xp:0, consumables:['ravika_m','ravika_m','ravika_m'],
+   items:['ew3_epc'], msg:'Nível 500! Você transcendeu a mortalidade.'}},
+
+  {id:'level_1000',cat:'nivel', icon:'👑', name:'O Eterno',          tier:5, desc:'Chegue ao nível 999',
+   req:(g)=>g.level>=999, reward:{gold:100000000, xp:0, consumables:['ravika_m','ravika_m','ravika_m','ravika_m'],
+   voidPiece:'void_ring', msg:'Nível 999! O Anel do Vazio reconhece o Eterno.'}},
+
+  // ── CATEGORIA: OURO ─────────────────────────────────────────────────────────
+  {id:'gold_1k',   cat:'ouro', icon:'⬡', name:'Homem de Posses',    tier:1, desc:'Acumule 1.000 ouro',
+   req:(g)=>g.gold>=1000,     reward:{gold:0, xp:200, consumables:['prist_s']}},
+
+  {id:'gold_50k',  cat:'ouro', icon:'💰', name:'Mercador',           tier:2, desc:'Acumule 50.000 ouro',
+   req:(g)=>g.gold>=50000,    reward:{gold:0, xp:5000, consumables:['prist_s','prist_s','prist_s']}},
+
+  {id:'gold_1m',   cat:'ouro', icon:'💎', name:'Magnata',            tier:3, desc:'Acumule 1.000.000 ouro',
+   req:(g)=>g.gold>=1000000,  reward:{gold:0, xp:50000, consumables:['prist_m','prist_m'], items:['re2']}},
+
+  {id:'gold_10m',  cat:'ouro', icon:'👑', name:'Rei da Fortuna',     tier:4, desc:'Acumule 10.000.000 ouro',
+   req:(g)=>g.gold>=10000000, reward:{gold:0, xp:500000, consumables:['ravika_s','ravika_s'], items:['re3']}},
+
+  {id:'gold_1b',   cat:'ouro', icon:'🌌', name:'O Tesoureiro do Vazio', tier:5, desc:'Acumule 1.000.000.000 ouro',
+   req:(g)=>g.gold>=1000000000,
+   reward:{gold:0, xp:5000000, consumables:['ravika_m','ravika_m','ravika_m'],
+   voidPiece:'void_ring', msg:'1 BILHÃO de ouro! O Anel do Vazio é seu!'}},
+
+  // ── CATEGORIA: CLÃ ──────────────────────────────────────────────────────────
+  {id:'clan_join',  cat:'cla', icon:'🛡️', name:'Irmão de Clã',       tier:1, desc:'Entre em um clã',
+   req:(g)=>!!g.clanName, reward:{gold:1000, xp:500}},
+
+  {id:'war_1',      cat:'cla', icon:'⚔️', name:'Primeira Guerra',     tier:1, desc:'Vença 1 guerra de clã',
+   req:(g)=>g.stats.warWins>=1, reward:{gold:5000, xp:3000, consumables:['prist_s','prist_s']}},
+
+  {id:'war_10',     cat:'cla', icon:'🏆', name:'General de Clã',      tier:2, desc:'Vença 10 guerras',
+   req:(g)=>g.stats.warWins>=10, reward:{gold:50000, xp:40000, consumables:['prist_m'], items:['re1']}},
+
+  {id:'war_100',    cat:'cla', icon:'💀', name:'Conquistador',        tier:3, desc:'Vença 100 guerras',
+   req:(g)=>g.stats.warWins>=100, reward:{gold:500000, xp:400000, consumables:['prist_m','prist_m','prist_m'], items:['re3']}},
+
+  {id:'war_1000',   cat:'cla', icon:'👑', name:'Imperador dos Clãs',  tier:4, desc:'Vença 1.000 guerras',
+   req:(g)=>g.stats.warWins>=1000,
+   reward:{gold:5000000, xp:4000000, consumables:['ravika_s','ravika_s','ravika_s'],
+   voidPiece:'void_gloves', msg:'1.000 guerras vencidas! As Luvas do Vazio são suas.'}},
+
+  // ── CATEGORIA: RAIDS ────────────────────────────────────────────────────────
+  {id:'raid_1',    cat:'raids', icon:'🌋', name:'Iniciado da Raid',   tier:1, desc:'Complete 1 raid',
+   req:(g)=>(g.stats.raids||0)>=1, reward:{gold:5000, xp:4000, consumables:['prist_s','prist_s']}},
+
+  {id:'raid_10',   cat:'raids', icon:'⚔️', name:'Assaltante',         tier:2, desc:'Complete 10 raids',
+   req:(g)=>(g.stats.raids||0)>=10, reward:{gold:50000, xp:40000, consumables:['prist_m','prist_m']}},
+
+  {id:'raid_50',   cat:'raids', icon:'🏆', name:'Caçador de Bosses',  tier:3, desc:'Complete 50 raids',
+   req:(g)=>(g.stats.raids||0)>=50, reward:{gold:300000, xp:250000, consumables:['prist_m','prist_m','prist_m'], items:['re3']}},
+
+  {id:'raid_200',  cat:'raids', icon:'💎', name:'Domador de Titãs',   tier:4, desc:'Complete 200 raids',
+   req:(g)=>(g.stats.raids||0)>=200,
+   reward:{gold:2000000, xp:1600000, consumables:['ravika_s','ravika_s','ravika_s'], items:['ew3_epc']}},
+
+  {id:'raid_1000', cat:'raids', icon:'👑', name:'Lenda das Raids',    tier:5, desc:'Complete 1.000 raids',
+   req:(g)=>(g.stats.raids||0)>=1000,
+   reward:{gold:10000000, xp:8000000, consumables:['ravika_m','ravika_m','ravika_m'],
+   items:['ew3_epc','ew3_epc'], msg:'1.000 raids! Um lendário.'}},
+
+  {id:'raid_10000',cat:'raids', icon:'🌌', name:'O Destruidor de Mundos', tier:5, desc:'Complete 10.000 raids',
+   req:(g)=>(g.stats.raids||0)>=10000,
+   reward:{gold:100000000, xp:80000000, consumables:['ravika_m','ravika_m','ravika_m','ravika_m'],
+   voidPiece:'void_weapon', msg:'10.000 raids! A Lâmina do Vazio foi forjada para você!'}},
+
+  // ── CATEGORIA: REFINAMENTO ──────────────────────────────────────────────────
+  {id:'refine_5',   cat:'forge', icon:'🔨', name:'Ferreiro Aprendiz',  tier:1, desc:'Refine um item até +5',
+   req:(g)=>(g.stats.maxRefine||0)>=5, reward:{gold:5000, xp:3000, consumables:['prist_s','prist_s']}},
+
+  {id:'refine_7',   cat:'forge', icon:'⚒️', name:'Mestre Ferreiro',   tier:2, desc:'Refine um item até +7',
+   req:(g)=>(g.stats.maxRefine||0)>=7, reward:{gold:30000, xp:25000, consumables:['prist_m','prist_m']}},
+
+  {id:'refine_10',  cat:'forge', icon:'💎', name:'Ferreiro Lendário',  tier:3, desc:'Refine um item até +10',
+   req:(g)=>(g.stats.maxRefine||0)>=10,
+   reward:{gold:200000, xp:160000, consumables:['ravika_s','ravika_s'], items:['re3']}},
+
+  {id:'refine_15',  cat:'forge', icon:'🌌', name:'O Ferreiro do Vazio', tier:5, desc:'Refine um item até +15',
+   req:(g)=>(g.stats.maxRefine||0)>=15,
+   reward:{gold:5000000, xp:4000000, consumables:['ravika_m','ravika_m','ravika_m'],
+   voidPiece:'void_gloves', msg:'+15! As Luvas do Vazio foram forjadas para suas mãos!'}},
 ];
+
+// Tier colors and labels
+const ACH_TIERS = {
+  1: {label:'Bronze',  color:'#cd7f32', bg:'rgba(205,127,50,.12)'},
+  2: {label:'Prata',   color:'#aaa',    bg:'rgba(170,170,170,.12)'},
+  3: {label:'Ouro',    color:'#ffd700', bg:'rgba(255,215,0,.12)'},
+  4: {label:'Épico',   color:'#ff7b00', bg:'rgba(255,123,0,.12)'},
+  5: {label:'Lendário',color:'#a259ff', bg:'rgba(162,89,255,.15)', glow:'0 0 12px #a259ff66'},
+};
+
+const ACH_CATS = {
+  missoes:'⚔️ Missões', kills:'💀 Inimigos', pvp:'🥊 PvP', crimes:'🎭 Crimes',
+  nivel:'⭐ Nível', ouro:'💰 Ouro', cla:'🛡️ Clã', raids:'🌋 Raids', forge:'🔨 Forja'
+};
+
 const WORLD_EVENTS = [
   {title:'🌑 Eclipse Sombrio',    desc:'Inimigos +20% HP. Dura 1h.'},
   {title:'⚔️ Hora do Orc',        desc:'Missões de orc +30% ouro. 45min.'},
@@ -4221,14 +4529,86 @@ function updateOwnCrowns(crowns) {
 function renderAchievements() {
   const list = document.getElementById('ach-list');
   if (!list) return;
-  list.innerHTML = ACHIEVEMENTS.map(a => {
-    const earned = (G.achievements||[]).includes(a.id);
-    return `<div class="ach-item${earned?' earned':''}">
-      <div class="ach-icon">${a.icon}</div>
-      <div><div class="ach-name">${a.name}</div><div class="ach-desc">${a.desc}</div></div>
-      ${earned?'<span class="badge badge-gold" style="margin-left:auto">✓</span>':''}
-    </div>`;
-  }).join('');
+
+  const earned = G.achievements || [];
+  const total  = ACHIEVEMENTS.length;
+  const done   = earned.length;
+
+  // Group by category
+  const bycat = {};
+  ACHIEVEMENTS.forEach(a => {
+    if (!bycat[a.cat]) bycat[a.cat] = [];
+    bycat[a.cat].push(a);
+  });
+
+  let html = '';
+
+  // Header stats
+  html += '<div style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin-bottom:14px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +   '<div style="font-family:Cinzel,serif;font-size:14px;color:var(--gold)">🏅 Progresso Total</div>'
+    +   '<div style="font-size:13px;color:var(--gold);font-weight:700">'+done+' / '+total+'</div>'
+    + '</div>'
+    + '<div style="background:var(--bg);border-radius:4px;height:8px;overflow:hidden">'
+    +   '<div style="height:100%;background:linear-gradient(90deg,var(--gold),#a259ff);border-radius:4px;transition:.4s;width:'
+    +   Math.round(done/total*100)+'%"></div>'
+    + '</div>'
+    + '</div>'
+    // Void Set progress
+    + '<div style="background:rgba(162,89,255,.08);border:1px solid rgba(162,89,255,.4);border-radius:var(--radius-lg);padding:12px;margin-bottom:14px">'
+    + '<div style="font-family:Cinzel,serif;font-size:13px;color:#a259ff;margin-bottom:8px">🌌 Set Arauto do Vazio</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:11px">'
+    + Object.values(VOID_SET_ITEMS).map(vi => {
+        const have = (G.inventory||[]).includes(vi.id) || Object.values(G.equipment||{}).includes(vi.id);
+        return '<div style="padding:6px;background:'+(have?'rgba(162,89,255,.2)':'rgba(0,0,0,.2)')+';border:1px solid '+(have?'#a259ff':'#333')+';border-radius:4px;text-align:center">'
+          + '<div style="font-size:16px">'+vi.icon+'</div>'
+          + '<div style="color:'+(have?'#a259ff':'var(--text-muted)')+'">'+vi.name.replace(' do Vazio','')+'</div>'
+          + (have ? '<div style="color:var(--green-light);font-size:10px">✓ Obtido</div>' : '<div style="color:var(--text-muted);font-size:10px">Bloqueado</div>')
+          + '</div>';
+      }).join('')
+    + '</div></div>';
+
+  // By category
+  Object.entries(ACH_CATS).forEach(([catId, catLabel]) => {
+    const cats = bycat[catId] || [];
+    if (!cats.length) return;
+    const catDone = cats.filter(a => earned.includes(a.id)).length;
+    html += '<div style="margin-bottom:14px">'
+      + '<div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">'
+      +   catLabel+' <span style="color:var(--gold)">'+catDone+'/'+cats.length+'</span>'
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:6px">'
+      + cats.map(a => {
+          const isEarned = earned.includes(a.id);
+          const tier = ACH_TIERS[a.tier||1];
+          const r = a.reward || {};
+          const rewardPreview = [];
+          if (r.gold > 0) rewardPreview.push('⬡ '+r.gold.toLocaleString());
+          if (r.xp   > 0) rewardPreview.push(r.xp.toLocaleString()+' XP');
+          if (r.consumables) rewardPreview.push(r.consumables.length+'x pedra');
+          if (r.items) rewardPreview.push(r.items.length+'x item raro');
+          if (r.voidPiece) rewardPreview.push('🌌 Peça do Vazio!');
+          return '<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius-lg);'
+            + 'background:'+(isEarned ? tier.bg : 'var(--bg-dark)')+';'
+            + 'border:1px solid '+(isEarned ? tier.color : 'var(--border)')+';'
+            + (isEarned && tier.glow ? 'box-shadow:'+tier.glow+';' : '')
+            + 'opacity:'+(isEarned ? '1' : '.8')+'">'
+            + '<div style="font-size:24px;flex-shrink:0">'+a.icon+'</div>'
+            + '<div style="flex:1;min-width:0">'
+            +   '<div style="font-size:13px;font-weight:600;color:'+(isEarned ? tier.color : 'var(--text)')+'">'+a.name+'</div>'
+            +   '<div style="font-size:11px;color:var(--text-muted)">'+a.desc+'</div>'
+            +   (rewardPreview.length ? '<div style="font-size:10px;color:'+(isEarned?'var(--text-muted)':tier.color)+';margin-top:2px">🎁 '+rewardPreview.join(' · ')+'</div>' : '')
+            + '</div>'
+            + '<div style="flex-shrink:0;text-align:right">'
+            +   '<div style="font-size:10px;font-weight:700;color:'+tier.color+';background:'+tier.bg+';padding:2px 6px;border-radius:3px">'+tier.label+'</div>'
+            +   (isEarned ? '<div style="font-size:14px;color:var(--green-light);margin-top:4px">✓</div>' : '')
+            + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div></div>';
+  });
+
+  list.innerHTML = html;
 }
 
 function clanTab(el, tab) {
@@ -5140,13 +5520,64 @@ async function respondClanReq(btn, accept) {
 // ACHIEVEMENTS
 // ══════════════════════════════════════════════════════════
 function checkAchievements() {
-  if(!G.achievements)G.achievements=[];
-  ACHIEVEMENTS.forEach(a=>{
-    if(!G.achievements.includes(a.id)&&a.req(G)){
-      G.achievements.push(a.id);
-      toast('🏅 Conquista: '+a.name,'info');
-      addLog('🏅 Conquista: '+a.name,'info');
+  if (!G.achievements) G.achievements = [];
+  ACHIEVEMENTS.forEach(a => {
+    if (G.achievements.includes(a.id)) return;
+    try { if (!a.req(G)) return; } catch(e) { return; }
+
+    G.achievements.push(a.id);
+    const tier = ACH_TIERS[a.tier||1];
+
+    // Grant rewards
+    const r = a.reward || {};
+    let msgs = [];
+    if (r.gold > 0)  { G.gold += r.gold; msgs.push('+⬡ '+r.gold.toLocaleString()+' ouro'); }
+    if (r.xp   > 0)  { gainXP(r.xp);     msgs.push('+'+r.xp.toLocaleString()+' XP'); }
+    if (r.consumables) {
+      if (!G.consumables) G.consumables = [];
+      r.consumables.forEach(c => G.consumables.push(c));
+      msgs.push('+'+r.consumables.length+' pedra(s)');
     }
+    if (r.items) {
+      if (!G.inventory) G.inventory = [];
+      r.items.forEach(it => G.inventory.push(it));
+      msgs.push('+'+r.items.length+' item(s) raro(s)');
+    }
+    // Void Set piece
+    if (r.voidPiece && VOID_SET_ITEMS[r.voidPiece]) {
+      if (!G.inventory) G.inventory = [];
+      G.inventory.push(r.voidPiece);
+      const vi = VOID_SET_ITEMS[r.voidPiece];
+      msgs.push('🌌 '+vi.name+' (Set do Vazio!)');
+    }
+
+    const rewardStr = msgs.length ? ' → '+msgs.join(', ') : '';
+    addLog('🏅 ['+tier.label+'] '+a.name+rewardStr, 'good');
+
+    // Show toast with tier color
+    toast('🏅 CONQUISTA: '+a.name+'! '+rewardStr, 'good');
+
+    // Special modal for tier 5 (legendary)
+    if (a.tier === 5) {
+      setTimeout(() => {
+        showModal(
+          '🌌 CONQUISTA LENDÁRIA!',
+          '<div style="text-align:center">'
+          + '<div style="font-size:48px;margin-bottom:8px">'+a.icon+'</div>'
+          + '<div style="font-family:Cinzel,serif;font-size:18px;color:#a259ff;margin-bottom:6px;text-shadow:0 0 12px #a259ff66">'+a.name+'</div>'
+          + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">'+a.desc+'</div>'
+          + (r.voidPiece && VOID_SET_ITEMS[r.voidPiece] ? '<div style="background:rgba(162,89,255,.15);border:1px solid rgba(162,89,255,.5);border-radius:var(--radius);padding:12px;margin-bottom:10px">'
+            + '<div style="font-size:24px">🌌</div>'
+            + '<div style="font-size:14px;font-weight:700;color:#a259ff">'+VOID_SET_ITEMS[r.voidPiece].name+'</div>'
+            + '<div style="font-size:11px;color:var(--text-muted)">'+VOID_SET_ITEMS[r.voidPiece].desc+'</div></div>' : '')
+          + '<div style="font-size:12px;color:var(--gold)">'+(r.msg||rewardStr)+'</div>'
+          + '</div>',
+          [{label:'🌌 Incrível!', cls:'btn-gold', fn:closeModal}]
+        );
+      }, 500);
+    }
+
+    scheduleSave();
   });
 }
 
