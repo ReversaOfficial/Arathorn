@@ -3838,7 +3838,7 @@ async function handleRequest(req, res) {
     const user = db.users[username];
     if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
     const g = user.gameState;
-    const isRaid = [49,50,51,52].includes(missionId);
+    const isRaid = missionId >= 49 && missionId <= 58;
     const players = getOnlinePlayers().filter(p => {
       if (p.username === username) return false; // exclude self
       if (isRaid) return true; // raids: all online

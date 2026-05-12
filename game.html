@@ -9464,7 +9464,7 @@ async function openGroupLobby(missionId) {
   // Load eligible online players
   showModal(m.icon + ' ' + m.name, '<div style="text-align:center;padding:20px;color:var(--text-muted)">Buscando jogadores online...</div>', []);
   const listRes = await api('GET', '/api/group/invite-list/'+missionId);
-  if (listRes.error) { closeModal(); toast(listRes.error,'bad'); return; }
+  if (listRes.error) { closeModal(); toast('Erro ao buscar jogadores: '+listRes.error,'bad'); console.error('[LOBBY]', listRes.error); return; }
 
   const needed  = m.clanSize || 2;
   const players = listRes.players || [];
