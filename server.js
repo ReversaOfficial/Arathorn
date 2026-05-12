@@ -4006,6 +4006,7 @@ async function handleRequest(req, res) {
     }); return;
   }
 
+  console.log('[404] Endpoint nao encontrado:', method, url);
   send(res, 404, { error: 'Endpoint nao encontrado.' });
 }
 
