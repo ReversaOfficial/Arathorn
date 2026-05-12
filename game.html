@@ -2252,10 +2252,11 @@ function scheduleSave() {
 
 // forceSave: salva na hora, sem debounce (usar em ações críticas)
 async function forceSave() {
-  // Store effective max values so server can use them for regen caps
+  // Store effective stats so server can use them for regen, power, etc.
   const _eff = getEffectiveStats();
   G.effectiveHpMax   = _eff.hpMax;
   G.effectiveStamMax = _eff.stamMax;
+  G.effectivePower   = myPower(); // power WITH equip bonuses — used by ranking
   clearTimeout(saveTimer);
   await doSave();
 }
@@ -5896,7 +5897,10 @@ function startHeartbeat() {
   clearInterval(heartbeatTimer);
   async function beat() {
     if (!AUTH.token || !G.name) return;
-    const power = calcPowerClient(G);
+    // myPower() includes equip bonuses — same as profile display
+    const power = myPower();
+    // Also save effective power into G so server can read it on /api/save
+    G.effectivePower = power;
     await api('POST', '/api/heartbeat', { info: {
       name: G.name, race: G.race, level: G.level,
       power, clanName: G.clanName || null, username: AUTH.username

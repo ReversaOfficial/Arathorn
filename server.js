@@ -951,7 +951,8 @@ async function handleRequest(req, res) {
         missions: (g.stats&&g.stats.missions)||0,
         pvpWins: (g.stats&&g.stats.pvpWins)||0,
         warWins: (g.stats&&g.stats.warWins)||0,
-        power: calcPower(g), clanName: g.clanName||null,
+        // Use effectivePower (with equip) if client saved it, else calculate base
+        power: g.effectivePower || calcPower(g), clanName: g.clanName||null,
         profilePrivate: g.profilePrivate||false,
       };
     });
@@ -3215,7 +3216,7 @@ async function handleRequest(req, res) {
         // Zone
         currentZone: g ? (g.currentZone||'mirkwood') : 'mirkwood',
         // Power
-        power: g ? calcPower(g) : 0,
+        power: g ? (g.effectivePower || calcPower(g)) : 0,
       };
     }).sort((a,b) => b.level - a.level);
     send(res, 200, { users, total: users.length }); return;
