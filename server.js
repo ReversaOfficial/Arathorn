@@ -621,8 +621,8 @@ function getToken(req) {
 // POWER CALCULATION
 function calcPower(g) {
   if (!g) return 0;
-  // Level is the PRIMARY driver of power (prevents low-lv high-stat exploits)
-  // Stats matter but level weight keeps the ranking meaningful
+  // Stats are the PRIMARY driver — equip, race, build all matter
+  // Level is secondary — a well-geared lower level can beat a bare higher level
   const lv    = (g.level||1);
   const str   = (g.str||10);
   const dex   = (g.dex||10);
@@ -631,13 +631,13 @@ function calcPower(g) {
   const kills = ((g.stats&&g.stats.kills)||0);
   const hp    = (g.hpMax||90);
   return Math.round(
-    lv * 150          // level: main factor — lv difference matters a lot
-    + str * 6
-    + dex * 4
-    + mag * 4
-    + res * 5
-    + hp  * 0.5       // HP pool contributes
-    + kills * 1       // PvP kills: minor bonus
+    lv  * 80    // level: still matters but no longer dominant
+    + str * 18  // STR: força de ataque
+    + dex * 15  // DEX: agilidade e precisão
+    + mag * 15  // MAG: poder mágico
+    + res * 20  // RES: resistência (tanque vale mais)
+    + hp  * 0.8 // HP: pool de vida
+    + kills * 2 // Kills PvP: bônus por combate real
   );
 }
 

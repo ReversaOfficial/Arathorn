@@ -3547,21 +3547,31 @@ function calcPowerClient(g) {
   const kills = (g.stats && g.stats.kills) || 0;
   const hp    = g.hpMax  || 90;
   return Math.round(
-    lv * 150
-    + str * 6
-    + dex * 4
-    + mag * 4
-    + res * 5
-    + hp  * 0.5
-    + kills * 1
+    lv  * 80
+    + str * 18
+    + dex * 15
+    + mag * 15
+    + res * 20
+    + hp  * 0.8
+    + kills * 2
   );
 }
 
-// My own power — uses same formula as server and ranking (base stats only)
-// This ensures profile, ranking, taverna and HUD all show identical values
+// My power — uses EFFECTIVE stats (with equip bonuses) so equipped items matter
 function myPower() {
-  return calcPowerClient(G);
+  const eff   = getEffectiveStats();
+  const kills = (G.stats && G.stats.kills) || 0;
+  return Math.round(
+    (G.level||1) * 80
+    + eff.str * 18
+    + eff.dex * 15
+    + eff.mag * 15
+    + eff.res * 20
+    + eff.hpMax * 0.8
+    + kills * 2
+  );
 }
+
 
 function updateUI() {
   const race = RACES[G.race] || RACES.humano;
