@@ -4530,11 +4530,11 @@ function renderAchievements() {
   const list = document.getElementById('ach-list');
   if (!list) return;
 
-  const earned = G.achievements || [];
-  const total  = ACHIEVEMENTS.length;
-  const done   = earned.length;
+  const earned  = G.achievements      || [];
+  const pending = G.pendingAchievements || [];
+  const total   = ACHIEVEMENTS.length;
+  const done    = earned.length;
 
-  // Group by category
   const bycat = {};
   ACHIEVEMENTS.forEach(a => {
     if (!bycat[a.cat]) bycat[a.cat] = [];
@@ -4543,73 +4543,130 @@ function renderAchievements() {
 
   let html = '';
 
-  // Header stats
-  html += '<div style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin-bottom:14px">'
+  // Progress header
+  html += '<div style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin-bottom:12px">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-    +   '<div style="font-family:Cinzel,serif;font-size:14px;color:var(--gold)">🏅 Progresso Total</div>'
-    +   '<div style="font-size:13px;color:var(--gold);font-weight:700">'+done+' / '+total+'</div>'
+    +   '<div style="font-family:Cinzel,serif;font-size:14px;color:var(--gold)">🏅 Progresso</div>'
+    +   '<div style="font-size:13px;color:var(--gold);font-weight:700">'+done+'/'+total+'</div>'
     + '</div>'
-    + '<div style="background:var(--bg);border-radius:4px;height:8px;overflow:hidden">'
-    +   '<div style="height:100%;background:linear-gradient(90deg,var(--gold),#a259ff);border-radius:4px;transition:.4s;width:'
-    +   Math.round(done/total*100)+'%"></div>'
+    + '<div style="background:#111;border-radius:4px;height:8px;overflow:hidden">'
+    +   '<div style="height:100%;background:linear-gradient(90deg,var(--gold),#a259ff);width:'+Math.round(done/total*100)+'%;transition:.4s"></div>'
     + '</div>'
-    + '</div>'
-    // Void Set progress
-    + '<div style="background:rgba(162,89,255,.08);border:1px solid rgba(162,89,255,.4);border-radius:var(--radius-lg);padding:12px;margin-bottom:14px">'
+    + (pending.length ? '<div style="margin-top:8px;font-size:12px;color:var(--green-light)">🎁 '+pending.length+' conquista(s) prontas para resgatar!</div>' : '')
+    + '</div>';
+
+  // Void Set progress
+  html += '<div style="background:rgba(162,89,255,.08);border:1px solid rgba(162,89,255,.4);border-radius:var(--radius-lg);padding:12px;margin-bottom:12px">'
     + '<div style="font-family:Cinzel,serif;font-size:13px;color:#a259ff;margin-bottom:8px">🌌 Set Arauto do Vazio</div>'
-    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:11px">'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">'
     + Object.values(VOID_SET_ITEMS).map(vi => {
         const have = (G.inventory||[]).includes(vi.id) || Object.values(G.equipment||{}).includes(vi.id);
-        return '<div style="padding:6px;background:'+(have?'rgba(162,89,255,.2)':'rgba(0,0,0,.2)')+';border:1px solid '+(have?'#a259ff':'#333')+';border-radius:4px;text-align:center">'
-          + '<div style="font-size:16px">'+vi.icon+'</div>'
-          + '<div style="color:'+(have?'#a259ff':'var(--text-muted)')+'">'+vi.name.replace(' do Vazio','')+'</div>'
-          + (have ? '<div style="color:var(--green-light);font-size:10px">✓ Obtido</div>' : '<div style="color:var(--text-muted);font-size:10px">Bloqueado</div>')
+        return '<div style="padding:6px;background:'+(have?'rgba(162,89,255,.2)':'rgba(0,0,0,.2)')+';border:1px solid '+(have?'#a259ff':'#333')+';border-radius:4px;text-align:center;font-size:11px">'
+          + '<div style="font-size:18px">'+vi.icon+'</div>'
+          + '<div style="color:'+(have?'#a259ff':'#666')+'">'+vi.name.replace(' do Vazio','')+'</div>'
+          + (have ? '<div style="color:var(--green-light)">✓</div>' : '<div style="color:#444">🔒</div>')
           + '</div>';
       }).join('')
     + '</div></div>';
 
-  // By category
+  // Each category
   Object.entries(ACH_CATS).forEach(([catId, catLabel]) => {
     const cats = bycat[catId] || [];
     if (!cats.length) return;
     const catDone = cats.filter(a => earned.includes(a.id)).length;
-    html += '<div style="margin-bottom:14px">'
-      + '<div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">'
+    const catPending = cats.filter(a => pending.includes(a.id)).length;
+    html += '<div style="margin-bottom:12px">'
+      + '<div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)">'
       +   catLabel+' <span style="color:var(--gold)">'+catDone+'/'+cats.length+'</span>'
-      + '</div>'
-      + '<div style="display:flex;flex-direction:column;gap:6px">'
-      + cats.map(a => {
-          const isEarned = earned.includes(a.id);
-          const tier = ACH_TIERS[a.tier||1];
-          const r = a.reward || {};
-          const rewardPreview = [];
-          if (r.gold > 0) rewardPreview.push('⬡ '+r.gold.toLocaleString());
-          if (r.xp   > 0) rewardPreview.push(r.xp.toLocaleString()+' XP');
-          if (r.consumables) rewardPreview.push(r.consumables.length+'x pedra');
-          if (r.items) rewardPreview.push(r.items.length+'x item raro');
-          if (r.voidPiece) rewardPreview.push('🌌 Peça do Vazio!');
-          return '<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius-lg);'
-            + 'background:'+(isEarned ? tier.bg : 'var(--bg-dark)')+';'
-            + 'border:1px solid '+(isEarned ? tier.color : 'var(--border)')+';'
-            + (isEarned && tier.glow ? 'box-shadow:'+tier.glow+';' : '')
-            + 'opacity:'+(isEarned ? '1' : '.8')+'">'
-            + '<div style="font-size:24px;flex-shrink:0">'+a.icon+'</div>'
-            + '<div style="flex:1;min-width:0">'
-            +   '<div style="font-size:13px;font-weight:600;color:'+(isEarned ? tier.color : 'var(--text)')+'">'+a.name+'</div>'
-            +   '<div style="font-size:11px;color:var(--text-muted)">'+a.desc+'</div>'
-            +   (rewardPreview.length ? '<div style="font-size:10px;color:'+(isEarned?'var(--text-muted)':tier.color)+';margin-top:2px">🎁 '+rewardPreview.join(' · ')+'</div>' : '')
-            + '</div>'
-            + '<div style="flex-shrink:0;text-align:right">'
-            +   '<div style="font-size:10px;font-weight:700;color:'+tier.color+';background:'+tier.bg+';padding:2px 6px;border-radius:3px">'+tier.label+'</div>'
-            +   (isEarned ? '<div style="font-size:14px;color:var(--green-light);margin-top:4px">✓</div>' : '')
-            + '</div>'
-            + '</div>';
-        }).join('')
-      + '</div></div>';
+      +   (catPending?' <span style="color:var(--green-light);font-size:10px">+'+catPending+' para resgatar</span>':'')
+      + '</div>';
+
+    cats.forEach(a => {
+      const isEarned  = earned.includes(a.id);
+      const isPending = pending.includes(a.id);
+      const tier = ACH_TIERS[a.tier||1];
+      const r = a.reward || {};
+      const rewardParts = [];
+      if (r.gold > 0)       rewardParts.push('⬡ '+r.gold.toLocaleString());
+      if (r.xp   > 0)       rewardParts.push(r.xp.toLocaleString()+' XP');
+      if (r.consumables && r.consumables.length) rewardParts.push(r.consumables.length+'x pedra');
+      if (r.items && r.items.length)             rewardParts.push(r.items.length+'x item');
+      if (r.voidPiece)      rewardParts.push('🌌 Peça do Vazio!');
+
+      const cardColor = isEarned ? '#1a2a1a' : isPending ? '#1a1a2a' : 'var(--bg-dark)';
+      const borderColor = isEarned ? 'var(--green-light)' : isPending ? tier.color : 'var(--border)';
+
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius-lg);'
+        + 'background:'+cardColor+';border:1px solid '+borderColor+';margin-bottom:6px;'
+        + (isPending&&tier.glow?'box-shadow:'+tier.glow+';':'')
+        + (isEarned?'opacity:.7':'') +'">'
+        + '<div style="font-size:24px;flex-shrink:0">'+a.icon+'</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13px;font-weight:600;color:'+(isEarned?'#4a8a4a':isPending?tier.color:'var(--text)')+'">'+a.name+'</div>'
+        +   '<div style="font-size:11px;color:var(--text-muted)">'+a.desc+'</div>'
+        +   (rewardParts.length ? '<div style="font-size:10px;color:'+(isEarned?'#555':tier.color)+';margin-top:2px">🎁 '+rewardParts.join(' · ')+'</div>' : '')
+        + '</div>'
+        + '<div style="flex-shrink:0;text-align:center">'
+        +   '<div style="font-size:10px;font-weight:700;color:'+tier.color+';background:'+tier.bg+';padding:2px 6px;border-radius:3px;margin-bottom:4px">'+tier.label+'</div>'
+        +   (isEarned
+              ? '<div style="font-size:12px;color:var(--green-light)">✓ Resgatado</div>'
+              : isPending
+                ? '<button class="btn btn-green" style="font-size:11px;padding:5px 10px" onclick="claimAchievement(\'' + a.id + '\')">🎁 Resgatar</button>'
+                : '<div style="font-size:10px;color:#555">Bloqueado</div>')
+        + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
   });
 
   list.innerHTML = html;
 }
+
+async function claimAchievement(achId) {
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  const res = await api('POST', '/api/achievement/claim', { achId });
+  if (btn) { btn.disabled = false; btn.textContent = '🎁 Resgatar'; }
+  if (res.error) { toast(res.error, 'bad'); return; }
+
+  // Apply to local state immediately
+  const r = res.rewards;
+  if (r.gold > 0) G.gold += r.gold;
+  if (!G.achievements) G.achievements = [];
+  G.achievements.push(achId);
+  // Remove from pending
+  if (G.pendingAchievements) G.pendingAchievements = G.pendingAchievements.filter(id => id !== achId);
+  if (r.cons && r.cons.length) { if(!G.consumables)G.consumables=[]; r.cons.forEach(c=>G.consumables.push(c)); }
+  if (r.items && r.items.length) { if(!G.inventory)G.inventory=[]; r.items.forEach(i=>G.inventory.push(i)); }
+  if (r.voidPiece) { if(!G.inventory)G.inventory=[]; G.inventory.push(r.voidPiece); }
+
+  // Reload full state (XP/level ups applied server-side)
+  api('GET','/api/load').then(lr=>{ if(lr.gameState){G=lr.gameState; updateUI(); renderAchievements(); } });
+
+  const rewardStr = r.msgs && r.msgs.length ? r.msgs.join(', ') : '';
+  toast('🏅 Resgatado! '+rewardStr, 'good');
+  addLog('🏅 Conquista resgatada! '+rewardStr, 'good');
+
+  // Update badge
+  const nb = document.getElementById('conquistas-badge');
+  const pCount = (G.pendingAchievements||[]).length;
+  if (nb) { nb.style.display = pCount > 0 ? '' : 'none'; if(pCount>0)nb.textContent=pCount; }
+
+  // Legendary modal
+  const achDef = ACHIEVEMENTS.find(a => a.id === achId);
+  if (achDef && achDef.tier === 5) {
+    showModal('🌌 CONQUISTA LENDÁRIA!',
+      '<div style="text-align:center">'
+      + '<div style="font-size:48px;margin-bottom:8px">'+achDef.icon+'</div>'
+      + '<div style="font-family:Cinzel,serif;font-size:18px;color:#a259ff;margin-bottom:8px;text-shadow:0 0 12px #a259ff66">'+achDef.name+'</div>'
+      + (r.voidPiece?'<div style="background:rgba(162,89,255,.15);border:1px solid rgba(162,89,255,.5);border-radius:var(--radius);padding:12px;margin-bottom:8px"><div style="font-size:22px">🌌</div><div style="color:#a259ff;font-weight:700">'+r.voidPiece.replace('_',' ').toUpperCase()+' DO VAZIO!</div></div>':'')
+      + '<div style="font-size:13px;color:var(--gold)">'+rewardStr+'</div>'
+      + '</div>',
+      [{label:'🌌 ÉPICO!', cls:'btn-gold', fn:closeModal}]
+    );
+  }
+}
+
 
 function clanTab(el, tab) {
   document.querySelectorAll('#clan-yes-page .tab').forEach(t=>t.classList.remove('active'));
@@ -5521,65 +5578,26 @@ async function respondClanReq(btn, accept) {
 // ══════════════════════════════════════════════════════════
 function checkAchievements() {
   if (!G.achievements) G.achievements = [];
+  let newlyUnlocked = 0;
   ACHIEVEMENTS.forEach(a => {
     if (G.achievements.includes(a.id)) return;
     try { if (!a.req(G)) return; } catch(e) { return; }
-
-    G.achievements.push(a.id);
-    const tier = ACH_TIERS[a.tier||1];
-
-    // Grant rewards
-    const r = a.reward || {};
-    let msgs = [];
-    if (r.gold > 0)  { G.gold += r.gold; msgs.push('+⬡ '+r.gold.toLocaleString()+' ouro'); }
-    if (r.xp   > 0)  { gainXP(r.xp);     msgs.push('+'+r.xp.toLocaleString()+' XP'); }
-    if (r.consumables) {
-      if (!G.consumables) G.consumables = [];
-      r.consumables.forEach(c => G.consumables.push(c));
-      msgs.push('+'+r.consumables.length+' pedra(s)');
+    // Newly unlocked — mark as pending claim (prefix ~)
+    if (!G.pendingAchievements) G.pendingAchievements = [];
+    if (!G.pendingAchievements.includes(a.id)) {
+      G.pendingAchievements.push(a.id);
+      newlyUnlocked++;
+      toast('🏅 Nova conquista disponível: ' + a.name + '! Vá em Conquistas para resgatar.', 'good');
+      addLog('🏅 Conquista disponível: ' + a.name, 'good');
     }
-    if (r.items) {
-      if (!G.inventory) G.inventory = [];
-      r.items.forEach(it => G.inventory.push(it));
-      msgs.push('+'+r.items.length+' item(s) raro(s)');
-    }
-    // Void Set piece
-    if (r.voidPiece && VOID_SET_ITEMS[r.voidPiece]) {
-      if (!G.inventory) G.inventory = [];
-      G.inventory.push(r.voidPiece);
-      const vi = VOID_SET_ITEMS[r.voidPiece];
-      msgs.push('🌌 '+vi.name+' (Set do Vazio!)');
-    }
-
-    const rewardStr = msgs.length ? ' → '+msgs.join(', ') : '';
-    addLog('🏅 ['+tier.label+'] '+a.name+rewardStr, 'good');
-
-    // Show toast with tier color
-    toast('🏅 CONQUISTA: '+a.name+'! '+rewardStr, 'good');
-
-    // Special modal for tier 5 (legendary)
-    if (a.tier === 5) {
-      setTimeout(() => {
-        showModal(
-          '🌌 CONQUISTA LENDÁRIA!',
-          '<div style="text-align:center">'
-          + '<div style="font-size:48px;margin-bottom:8px">'+a.icon+'</div>'
-          + '<div style="font-family:Cinzel,serif;font-size:18px;color:#a259ff;margin-bottom:6px;text-shadow:0 0 12px #a259ff66">'+a.name+'</div>'
-          + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">'+a.desc+'</div>'
-          + (r.voidPiece && VOID_SET_ITEMS[r.voidPiece] ? '<div style="background:rgba(162,89,255,.15);border:1px solid rgba(162,89,255,.5);border-radius:var(--radius);padding:12px;margin-bottom:10px">'
-            + '<div style="font-size:24px">🌌</div>'
-            + '<div style="font-size:14px;font-weight:700;color:#a259ff">'+VOID_SET_ITEMS[r.voidPiece].name+'</div>'
-            + '<div style="font-size:11px;color:var(--text-muted)">'+VOID_SET_ITEMS[r.voidPiece].desc+'</div></div>' : '')
-          + '<div style="font-size:12px;color:var(--gold)">'+(r.msg||rewardStr)+'</div>'
-          + '</div>',
-          [{label:'🌌 Incrível!', cls:'btn-gold', fn:closeModal}]
-        );
-      }, 500);
-    }
-
-    scheduleSave();
   });
+  if (newlyUnlocked > 0) {
+    // Badge on nav
+    const nb = document.getElementById('conquistas-badge');
+    if (nb) { nb.style.display=''; nb.textContent = (G.pendingAchievements||[]).length; }
+  }
 }
+
 
 // ══════════════════════════════════════════════════════════
 // CHARACTER CREATION

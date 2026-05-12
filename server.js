@@ -3853,6 +3853,158 @@ async function handleRequest(req, res) {
     send(res,200,{players}); return;
   }
 
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ACHIEVEMENT SYSTEM — server-side claim
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // POST /api/achievement/claim — verify + grant reward
+  if (method === 'POST' && url === '/api/achievement/claim') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { achId } = await readBody(req);
+    if (!achId) { send(res,400,{error:'achId necessario.'}); return; }
+
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+
+    if (!g.achievements) g.achievements = [];
+    if (!g.stats) g.stats = {};
+
+    // Already claimed
+    if (g.achievements.includes(achId)) {
+      send(res,409,{error:'Conquista ja resgatada.'}); return;
+    }
+
+    // Define all achievements server-side for verification
+    const ACHS = {
+      // Missoes
+      mission_1:    {req:(g)=>g.stats.missions>=1,     gold:100,     xp:50,    cons:[], items:[]},
+      mission_10:   {req:(g)=>g.stats.missions>=10,    gold:500,     xp:300,   cons:[], items:[]},
+      mission_50:   {req:(g)=>g.stats.missions>=50,    gold:3000,    xp:2000,  cons:['prist_s','prist_s'], items:[]},
+      mission_100:  {req:(g)=>g.stats.missions>=100,   gold:10000,   xp:8000,  cons:['prist_s','prist_s','prist_s'], items:[]},
+      mission_250:  {req:(g)=>g.stats.missions>=250,   gold:30000,   xp:25000, cons:['prist_m','prist_m'], items:[]},
+      mission_500:  {req:(g)=>g.stats.missions>=500,   gold:100000,  xp:80000, cons:['prist_m','prist_m','prist_m'], items:['re3']},
+      mission_1000: {req:(g)=>g.stats.missions>=1000,  gold:350000,  xp:300000,cons:['ravika_s','ravika_s','prist_m','prist_m','prist_m'], items:['ran3']},
+      mission_2000: {req:(g)=>g.stats.missions>=2000,  gold:1200000, xp:1000000,cons:['ravika_s','ravika_s','ravika_s'], items:['ew3_epc','ew3_epc']},
+      mission_3000: {req:(g)=>g.stats.missions>=3000,  gold:3000000, xp:2500000,cons:['ravika_m','ravika_m'], items:['ew3_epc','ew3_epc','ew3_epc']},
+      mission_5000: {req:(g)=>g.stats.missions>=5000,  gold:10000000,xp:8000000,cons:['ravika_m','ravika_m','ravika_m'], void:'void_helmet'},
+      mission_10000:{req:(g)=>g.stats.missions>=10000, gold:50000000,xp:40000000,cons:['ravika_m','ravika_m','ravika_m','ravika_m'], void:'void_helmet'},
+      // Kills
+      kill_10:      {req:(g)=>g.stats.kills>=10,       gold:200,     xp:100,   cons:[], items:[]},
+      kill_100:     {req:(g)=>g.stats.kills>=100,       gold:2000,    xp:1500,  cons:['prist_s'], items:[]},
+      kill_500:     {req:(g)=>g.stats.kills>=500,       gold:15000,   xp:12000, cons:['prist_s','prist_s','prist_s'], items:[]},
+      kill_2000:    {req:(g)=>g.stats.kills>=2000,      gold:80000,   xp:65000, cons:['prist_m','prist_m'], items:['rm1']},
+      kill_5000:    {req:(g)=>g.stats.kills>=5000,      gold:300000,  xp:250000,cons:['prist_m','prist_m','prist_m'], items:['rm2']},
+      kill_10000:   {req:(g)=>g.stats.kills>=10000,     gold:1000000, xp:800000,cons:['ravika_s','ravika_s'], items:['rm3']},
+      kill_50000:   {req:(g)=>g.stats.kills>=50000,     gold:10000000,xp:8000000,cons:['ravika_m','ravika_m','ravika_m'], void:'void_weapon'},
+      // PvP
+      pvp_1:        {req:(g)=>g.stats.pvpWins>=1,       gold:500,     xp:300,   cons:[], items:[]},
+      pvp_10:       {req:(g)=>g.stats.pvpWins>=10,      gold:5000,    xp:4000,  cons:['prist_s','prist_s'], items:[]},
+      pvp_50:       {req:(g)=>g.stats.pvpWins>=50,      gold:30000,   xp:25000, cons:['prist_m'], items:['re1']},
+      pvp_200:      {req:(g)=>g.stats.pvpWins>=200,     gold:200000,  xp:160000,cons:['prist_m','prist_m'], items:['re2']},
+      pvp_1000:     {req:(g)=>g.stats.pvpWins>=1000,    gold:2000000, xp:1600000,cons:['ravika_s','ravika_s','ravika_s'], items:['re3']},
+      pvp_5000:     {req:(g)=>g.stats.pvpWins>=5000,    gold:15000000,xp:12000000,cons:['ravika_m','ravika_m','ravika_m'], void:'void_armor'},
+      // Crimes
+      crime_1:      {req:(g)=>g.stats.crimes>=1,        gold:300,     xp:200,   cons:[], items:[]},
+      crime_50:     {req:(g)=>g.stats.crimes>=50,        gold:10000,   xp:8000,  cons:['prist_s','prist_s'], items:[]},
+      crime_200:    {req:(g)=>g.stats.crimes>=200,       gold:60000,   xp:50000, cons:['prist_m'], items:['ra1']},
+      crime_1000:   {req:(g)=>g.stats.crimes>=1000,      gold:500000,  xp:400000,cons:['prist_m','prist_m','prist_m'], items:['ra2']},
+      crime_5000:   {req:(g)=>g.stats.crimes>=5000,      gold:5000000, xp:4000000,cons:['ravika_s','ravika_s'], items:['ra3']},
+      crime_10000:  {req:(g)=>g.stats.crimes>=10000,     gold:20000000,xp:16000000,cons:['ravika_m','ravika_m','ravika_m'], void:'void_boots'},
+      // Nivel
+      level_5:      {req:(g)=>g.level>=5,                gold:500,     xp:0,     cons:[], items:[]},
+      level_10:     {req:(g)=>g.level>=10,               gold:2000,    xp:0,     cons:['prist_s'], items:[]},
+      level_25:     {req:(g)=>g.level>=25,               gold:10000,   xp:0,     cons:['prist_s','prist_s'], items:[]},
+      level_50:     {req:(g)=>g.level>=50,               gold:50000,   xp:0,     cons:['prist_m'], items:[]},
+      level_100:    {req:(g)=>g.level>=100,              gold:200000,  xp:0,     cons:['prist_m','prist_m'], items:['re2']},
+      level_200:    {req:(g)=>g.level>=200,              gold:1000000, xp:0,     cons:['ravika_s','ravika_s'], items:['re3']},
+      level_500:    {req:(g)=>g.level>=500,              gold:10000000,xp:0,     cons:['ravika_m','ravika_m','ravika_m'], items:['ew3_epc']},
+      level_1000:   {req:(g)=>g.level>=999,              gold:100000000,xp:0,    cons:['ravika_m','ravika_m','ravika_m','ravika_m'], void:'void_ring'},
+      // Ouro
+      gold_1k:      {req:(g)=>g.gold>=1000,              gold:0,       xp:200,   cons:['prist_s'], items:[]},
+      gold_50k:     {req:(g)=>g.gold>=50000,             gold:0,       xp:5000,  cons:['prist_s','prist_s','prist_s'], items:[]},
+      gold_1m:      {req:(g)=>g.gold>=1000000,           gold:0,       xp:50000, cons:['prist_m','prist_m'], items:['re2']},
+      gold_10m:     {req:(g)=>g.gold>=10000000,          gold:0,       xp:500000,cons:['ravika_s','ravika_s'], items:['re3']},
+      gold_1b:      {req:(g)=>g.gold>=1000000000,        gold:0,       xp:5000000,cons:['ravika_m','ravika_m','ravika_m'], void:'void_ring'},
+      // Cla
+      clan_join:    {req:(g)=>!!g.clanName,              gold:1000,    xp:500,   cons:[], items:[]},
+      war_1:        {req:(g)=>g.stats.warWins>=1,        gold:5000,    xp:3000,  cons:['prist_s','prist_s'], items:[]},
+      war_10:       {req:(g)=>g.stats.warWins>=10,       gold:50000,   xp:40000, cons:['prist_m'], items:['re1']},
+      war_100:      {req:(g)=>g.stats.warWins>=100,      gold:500000,  xp:400000,cons:['prist_m','prist_m','prist_m'], items:['re3']},
+      war_1000:     {req:(g)=>g.stats.warWins>=1000,     gold:5000000, xp:4000000,cons:['ravika_s','ravika_s','ravika_s'], void:'void_gloves'},
+      // Raids
+      raid_1:       {req:(g)=>(g.stats.raids||0)>=1,     gold:5000,    xp:4000,  cons:['prist_s','prist_s'], items:[]},
+      raid_10:      {req:(g)=>(g.stats.raids||0)>=10,    gold:50000,   xp:40000, cons:['prist_m','prist_m'], items:[]},
+      raid_50:      {req:(g)=>(g.stats.raids||0)>=50,    gold:300000,  xp:250000,cons:['prist_m','prist_m','prist_m'], items:['re3']},
+      raid_200:     {req:(g)=>(g.stats.raids||0)>=200,   gold:2000000, xp:1600000,cons:['ravika_s','ravika_s','ravika_s'], items:['ew3_epc']},
+      raid_1000:    {req:(g)=>(g.stats.raids||0)>=1000,  gold:10000000,xp:8000000,cons:['ravika_m','ravika_m','ravika_m'], items:['ew3_epc','ew3_epc']},
+      raid_10000:   {req:(g)=>(g.stats.raids||0)>=10000, gold:100000000,xp:80000000,cons:['ravika_m','ravika_m','ravika_m','ravika_m'], void:'void_weapon'},
+      // Forja
+      refine_5:     {req:(g)=>(g.stats.maxRefine||0)>=5, gold:5000,    xp:3000,  cons:['prist_s','prist_s'], items:[]},
+      refine_7:     {req:(g)=>(g.stats.maxRefine||0)>=7, gold:30000,   xp:25000, cons:['prist_m','prist_m'], items:[]},
+      refine_10:    {req:(g)=>(g.stats.maxRefine||0)>=10,gold:200000,  xp:160000,cons:['ravika_s','ravika_s'], items:['re3']},
+      refine_15:    {req:(g)=>(g.stats.maxRefine||0)>=15,gold:5000000, xp:4000000,cons:['ravika_m','ravika_m','ravika_m'], void:'void_gloves'},
+    };
+
+    // Void Set items for granting
+    const VOID_SET = {
+      void_weapon: 'void_weapon', void_helmet: 'void_helmet', void_armor: 'void_armor',
+      void_boots: 'void_boots', void_gloves: 'void_gloves', void_ring: 'void_ring',
+    };
+
+    const achDef = ACHS[achId];
+    if (!achDef) { send(res,404,{error:'Conquista desconhecida: '+achId}); return; }
+
+    // Verify requirement server-side
+    try {
+      if (!achDef.req(g)) {
+        send(res,400,{error:'Requisito nao atendido para esta conquista.'}); return;
+      }
+    } catch(e) {
+      send(res,400,{error:'Erro ao verificar requisito.'}); return;
+    }
+
+    // Grant rewards
+    if (achDef.gold > 0) g.gold = (g.gold||0) + achDef.gold;
+    if (achDef.xp   > 0) {
+      g.xp = (g.xp||0) + achDef.xp;
+      applyServerLevelUps(g);
+    }
+    if (!g.consumables) g.consumables = [];
+    (achDef.cons||[]).forEach(c => g.consumables.push(c));
+    if (!g.inventory) g.inventory = [];
+    (achDef.items||[]).forEach(i => g.inventory.push(i));
+    if (achDef.void) g.inventory.push(achDef.void);
+
+    g.achievements.push(achId);
+
+    if (!g.log) g.log = [];
+    const msgs = [];
+    if (achDef.gold > 0) msgs.push('+'+achDef.gold.toLocaleString()+' ouro');
+    if (achDef.xp   > 0) msgs.push('+'+achDef.xp.toLocaleString()+' XP');
+    if (achDef.cons && achDef.cons.length) msgs.push(achDef.cons.length+'x pedras');
+    if (achDef.items && achDef.items.length) msgs.push(achDef.items.length+'x item(s)');
+    if (achDef.void) msgs.push('🌌 '+achDef.void.replace('_',' ').replace('void ','')+' do Vazio!');
+    g.log.unshift({msg:'🏅 Conquista resgatada: '+achId+' → '+msgs.join(', '), cls:'good'});
+
+    saveDB(db);
+
+    send(res,200,{
+      ok: true, achId,
+      rewards: {
+        gold: achDef.gold||0,
+        xp:   achDef.xp||0,
+        cons: achDef.cons||[],
+        items: achDef.items||[],
+        voidPiece: achDef.void||null,
+        msgs,
+      }
+    }); return;
+  }
+
   send(res, 404, { error: 'Endpoint nao encontrado.' });
 }
 
