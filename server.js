@@ -3548,6 +3548,166 @@ async function handleRequest(req, res) {
   }
 
 
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RAID ROUTES — page-specific raid lobby (aliases group system)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // POST /api/raid/create — create raid room
+  if (method === 'POST' && url === '/api/raid/create') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { raidId } = await readBody(req);
+    const db = loadDB();
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+    if (isRestricted(g)) { send(res,400,{error:'Voce esta preso ou na enfermaria.'}); return; }
+
+    // Raid definitions
+    const RAID_DEFS = {
+      49: {id:49,name:'Rainha das Aranhas de Mirkwood', slots:2, stam:4,minLv:10,  gold:[3000,6000],    xp:[2500,4800]},
+      50: {id:50,name:'O Rei Bruxo de Angmar',          slots:3, stam:5,minLv:20,  gold:[20000,38000],  xp:[16000,30000]},
+      51: {id:51,name:'O Senhor dos Oliphants',         slots:3, stam:5,minLv:40,  gold:[80000,140000], xp:[64000,112000]},
+      52: {id:52,name:'Os Nove Cavaleiros do Apocalipse',slots:4,stam:6,minLv:70,  gold:[350000,580000],xp:[280000,464000]},
+      53: {id:53,name:'Smaug, o Devastador',            slots:4, stam:6,minLv:100, gold:[900000,1500000],xp:[720000,1200000]},
+      54: {id:54,name:'Sauron, o Senhor do Um Anel',    slots:5, stam:7,minLv:140, gold:[4000000,6500000],xp:[3200000,5200000]},
+      55: {id:55,name:'Balrog Ancestral das Eras',      slots:6, stam:7,minLv:200, gold:[18000000,30000000],xp:[14400000,24000000]},
+      56: {id:56,name:'O Necromante Eterno',            slots:7, stam:8,minLv:350, gold:[80000000,135000000],xp:[64000000,108000000]},
+      57: {id:57,name:'Morgoth, o Deus Negro',          slots:8, stam:9,minLv:500, gold:[600000000,1000000000],xp:[480000000,800000000]},
+      58: {id:58,name:'O Deus do Caos Primordial',      slots:10,stam:10,minLv:700,gold:[5000000000,8000000000],xp:[4000000000,6400000000]},
+    };
+
+    const raidNum = parseInt(raidId) || 0;
+    const raidDef = RAID_DEFS[raidNum];
+    if (!raidDef) { send(res,404,{error:'Raid nao encontrada: '+raidId}); return; }
+    if (g.level < raidDef.minLv) { send(res,400,{error:'Nivel minimo '+raidDef.minLv+' necessario.'}); return; }
+    if ((g.stam||0) < raidDef.stam) { send(res,400,{error:'Estamina insuficiente. Precisa de '+raidDef.stam+'.'}); return; }
+
+    // Create room
+    if (!db.groupRooms) db.groupRooms = {};
+    // Remove expired rooms
+    Object.keys(db.groupRooms).forEach(k => {
+      if (db.groupRooms[k].expiresAt < Date.now()) delete db.groupRooms[k];
+    });
+    // Check if already in room
+    const existing = Object.values(db.groupRooms).find(r =>
+      r.status==='waiting' && r.members.find(m => m.username===username)
+    );
+    if (existing) { send(res,400,{error:'Voce ja esta em uma sala. Saia antes de criar outra.'}); return; }
+
+    const roomId = 'raid_' + raidNum + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    db.groupRooms[roomId] = {
+      id: roomId, missionId: raidNum, isRaid: true,
+      clanName: null, leader: username, leaderName: g.name,
+      members: [{ username, name:g.name, race:g.race, level:g.level, power:calcPower(g)||0 }],
+      status: 'waiting',
+      createdAt: Date.now(), expiresAt: Date.now() + 15*60*1000,
+    };
+    saveDB(db);
+
+    // Notify all online players via SSE
+    getOnlinePlayers().forEach(p => {
+      if (p.username === username) return;
+      if (g.level < raidDef.minLv) return;
+      sendSSE(p.username, 'group_invite', {
+        roomId, missionId: raidNum, leaderName: g.name, isRaid: true,
+        raidName: raidDef.name
+      });
+    });
+
+    send(res,200,{ ok:true, roomId, raid: raidDef }); return;
+  }
+
+  // POST /api/raid/join — join an existing raid room
+  if (method === 'POST' && url === '/api/raid/join') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { roomId } = await readBody(req);
+    const db = loadDB();
+    const room = db.groupRooms && db.groupRooms[roomId];
+    if (!room) { send(res,404,{error:'Sala nao encontrada ou expirada.'}); return; }
+    if (room.status !== 'waiting') { send(res,400,{error:'Sala ja iniciou.'}); return; }
+    const user = db.users[username];
+    if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
+    const g = user.gameState;
+    if (isRestricted(g)) { send(res,400,{error:'Voce esta preso ou na enfermaria.'}); return; }
+    if (room.members.find(m => m.username === username)) { send(res,409,{error:'Voce ja esta nesta sala.'}); return; }
+
+    room.members.push({ username, name:g.name, race:g.race, level:g.level, power:calcPower(g)||0 });
+    saveDB(db);
+
+    // Notify all room members of new joiner
+    room.members.forEach(m => sendSSE(m.username, 'group_update', { room }));
+    send(res,200,{ ok:true, room }); return;
+  }
+
+  // GET /api/raid/room/:roomId — get raid room state
+  if (method === 'GET' && url.startsWith('/api/raid/room/')) {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const roomId = url.slice('/api/raid/room/'.length);
+    const db = loadDB();
+    const room = db.groupRooms && db.groupRooms[roomId];
+    if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
+    const RAID_DEFS = {
+      49:{slots:2},50:{slots:3},51:{slots:3},52:{slots:4},53:{slots:4},
+      54:{slots:5},55:{slots:6},56:{slots:7},57:{slots:8},58:{slots:10}
+    };
+    send(res,200,{ room, raidDef: RAID_DEFS[room.missionId]||{slots:2} }); return;
+  }
+
+  // POST /api/raid/start — start the raid
+  if (method === 'POST' && url === '/api/raid/start') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { roomId } = await readBody(req);
+    const db = loadDB();
+    const room = db.groupRooms && db.groupRooms[roomId];
+    if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
+    if (room.status !== 'waiting') { send(res,400,{error:'Sala ja iniciada.'}); return; }
+    if (!room.members.find(m => m.username === username)) { send(res,403,{error:'Voce nao esta nesta sala.'}); return; }
+    const CLAN_MISSIONS = {
+      49:{clanSize:2,stam:4},50:{clanSize:3,stam:5},51:{clanSize:3,stam:5},
+      52:{clanSize:4,stam:6},53:{clanSize:4,stam:6},54:{clanSize:5,stam:7},
+      55:{clanSize:6,stam:7},56:{clanSize:7,stam:8},57:{clanSize:8,stam:9},58:{clanSize:10,stam:10}
+    };
+    const mDef = CLAN_MISSIONS[room.missionId];
+    if (mDef && room.members.length < mDef.clanSize) {
+      send(res,400,{error:'Precisa de '+mDef.clanSize+' membros. Tem '+room.members.length+'.'}); return;
+    }
+    room.status = 'active';
+    // Consume stam from all members
+    if (mDef) {
+      room.members.forEach(m => {
+        const u = db.users[m.username];
+        if (u&&u.gameState) u.gameState.stam = Math.max(0,(u.gameState.stam||0)-mDef.stam);
+      });
+    }
+    saveDB(db);
+    room.members.forEach(m => sendSSE(m.username,'group_started',{roomId,missionId:room.missionId}));
+    send(res,200,{ok:true}); return;
+  }
+
+  // POST /api/raid/leave — leave a raid room
+  if (method === 'POST' && url === '/api/raid/leave') {
+    const username = verifyToken(getToken(req));
+    if (!username) { send(res,401,{error:'Nao autenticado.'}); return; }
+    const { roomId } = await readBody(req);
+    const db = loadDB();
+    const room = db.groupRooms && db.groupRooms[roomId];
+    if (!room) { send(res,404,{error:'Sala nao encontrada.'}); return; }
+    room.members = room.members.filter(m => m.username !== username);
+    if (room.members.length === 0 || room.leader === username) {
+      room.members.forEach(m => sendSSE(m.username,'group_cancelled',{roomId}));
+      delete db.groupRooms[roomId];
+    } else {
+      room.members.forEach(m => sendSSE(m.username,'group_update',{room}));
+    }
+    saveDB(db);
+    send(res,200,{ok:true}); return;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // GROUP MISSION SYSTEM — clan missions + raids require minimum players
   // Leader creates room → invites clanmates → when full, start together
