@@ -107,6 +107,7 @@ tr.sel td{background:rgba(201,168,76,.09)}
       <label class="btn btn-sm btn-green" style="cursor:pointer">
         ⬆ DB<input type="file" accept=".json" onchange="importDB(this)" style="display:none">
       </label>
+      <button class="btn btn-sm btn-purple" onclick="showPaymentPanel()">💰 Pagamentos</button>
       <button class="btn btn-sm btn-muted" onclick="doLogout()">Sair</button>
     </div>
   </div>
@@ -224,6 +225,73 @@ tr.sel td{background:rgba(201,168,76,.09)}
 </div>
 
 <div id="toast"></div>
+
+<!-- Payment Panel Modal -->
+<div id="payment-panel" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.7);align-items:center;justify-content:center">
+  <div style="background:#1e1810;border:1px solid #3a3025;border-radius:12px;padding:24px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="font:700 16px Georgia,serif;color:var(--gold)">💰 Pagamentos</h2>
+      <button class="btn btn-sm btn-muted" onclick="document.getElementById('payment-panel').style.display='none'">✕</button>
+    </div>
+
+    <!-- Manual Credit -->
+    <div style="background:#120e0a;border:1px solid #2a2218;border-radius:8px;padding:16px;margin-bottom:14px">
+      <h3 style="font-size:12px;color:var(--gold);margin-bottom:10px">⚡ Creditar Manualmente</h3>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input class="inp" id="pay-username" placeholder="Username do jogador" style="margin:0;flex:1;padding:8px">
+        <select id="pay-product" class="inp" style="margin:0;flex:1;padding:8px">
+          <option value="ouro_pequeno">⬡ Saco de Ouro — R$4,90 (10k ouro)</option>
+          <option value="ouro_medio">⬡⬡ Baú de Ouro — R$14,90 (50k ouro)</option>
+          <option value="ouro_grande">⬡⬡⬡ Tesouro — R$39,90 (240k ouro)</option>
+          <option value="pack_iniciante">⚔ Pack Iniciante — R$9,90</option>
+          <option value="pack_guerreiro">🛡 Pack Guerreiro — R$24,90</option>
+          <option value="pack_lendario">👑 Pack Lendário — R$59,90</option>
+          <option value="vip_30">👑 VIP 30 dias — R$9,90</option>
+          <option value="vip_90">👑 VIP 90 dias — R$24,90</option>
+          <option value="pedras_prist">💠 Prist x10 — R$7,90</option>
+          <option value="pedras_ravika">🌑 Ravika x5 — R$14,90</option>
+          <option value="bail_pix">⚖️ Sair da Cadeia — R$2,99</option>
+          <option value="revive_pix">💊 Sair da Enfermaria — R$2,99</option>
+        </select>
+      </div>
+      <button class="btn btn-gold" style="width:100%" onclick="creditManually()">✓ Creditar Agora</button>
+    </div>
+
+    <!-- Recover by Payment ID -->
+    <div style="background:#120e0a;border:1px solid #2a2218;border-radius:8px;padding:16px;margin-bottom:14px">
+      <h3 style="font-size:12px;color:var(--gold);margin-bottom:10px">🔍 Recuperar por ID do Pagamento MP</h3>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input class="inp" id="pay-mpid" placeholder="ID do pagamento (ex: 98765432)" style="margin:0;flex:1;padding:8px">
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input class="inp" id="pay-rec-user" placeholder="Username (se não achar automaticamente)" style="margin:0;flex:1;padding:8px">
+        <select id="pay-rec-product" class="inp" style="margin:0;flex:1;padding:8px">
+          <option value="">— Produto (se necessário) —</option>
+          <option value="ouro_pequeno">Saco de Ouro R$4,90</option>
+          <option value="ouro_medio">Baú de Ouro R$14,90</option>
+          <option value="ouro_grande">Tesouro R$39,90</option>
+          <option value="pack_iniciante">Pack Iniciante R$9,90</option>
+          <option value="pack_guerreiro">Pack Guerreiro R$24,90</option>
+          <option value="pack_lendario">Pack Lendário R$59,90</option>
+          <option value="vip_30">VIP 30 dias R$9,90</option>
+          <option value="vip_90">VIP 90 dias R$24,90</option>
+        </select>
+      </div>
+      <button class="btn btn-blue" style="width:100%" onclick="recoverPayment()">🔍 Verificar e Aplicar</button>
+    </div>
+
+    <!-- Purchase Log -->
+    <div style="background:#120e0a;border:1px solid #2a2218;border-radius:8px;padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <h3 style="font-size:12px;color:var(--gold)">📋 Histórico de Compras</h3>
+        <button class="btn btn-sm btn-muted" onclick="loadPurchaseLog()">↻</button>
+      </div>
+      <div id="purchase-log" style="font-size:11px;max-height:200px;overflow-y:auto;color:var(--text2)">
+        <div style="color:var(--text3)">Clique ↻ para carregar</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -492,6 +560,55 @@ async function toggleBan() {
 }
 
 // ── DB EXPORT / IMPORT ────────────────────────────────────────────────────────
+function showPaymentPanel() {
+  document.getElementById('payment-panel').style.display = 'flex';
+  loadPurchaseLog();
+}
+
+async function creditManually() {
+  const u = document.getElementById('pay-username').value.trim();
+  const p = document.getElementById('pay-product').value;
+  if (!u || !p) { toast('Preencha username e produto.','red'); return; }
+  if (!confirm('Creditar "'+p+'" para @'+u+'?')) return;
+  const d = await req('POST','/api/admin/credit-payment',{targetUsername:u,productId:p,note:'Admin manual'});
+  if (!d) return;
+  if (d.error) { toast(d.error,'red'); return; }
+  toast('✓ Creditado! +'+( d.applied.gold||0).toLocaleString()+' ouro para @'+u);
+  loadPurchaseLog();
+}
+
+async function recoverPayment() {
+  const mpid = document.getElementById('pay-mpid').value.trim();
+  const u    = document.getElementById('pay-rec-user').value.trim();
+  const p    = document.getElementById('pay-rec-product').value;
+  if (!mpid) { toast('Informe o ID do pagamento.','red'); return; }
+  const d = await req('POST','/api/admin/check-mp-payment',{
+    paymentId: mpid,
+    targetUsername: u||undefined,
+    productId: p||undefined
+  });
+  if (!d) return;
+  if (d.error) { toast(d.error,'red'); return; }
+  toast('✓ '+d.product+' creditado para @'+d.username+(d.gold?(' +⬡'+d.gold.toLocaleString()):''));
+  loadPurchaseLog();
+}
+
+async function loadPurchaseLog() {
+  const el = document.getElementById('purchase-log');
+  if (!el) return;
+  const d = await req('GET','/api/admin/purchase-log');
+  if (!d||!d.log) { el.innerHTML='<div style="color:var(--text3)">Sem compras.</div>'; return; }
+  el.innerHTML = d.log.length ? d.log.map(l =>
+    '<div style="padding:3px 0;border-bottom:1px solid #1a1408">'
+    + '<b style="color:var(--text)">@'+l.username+'</b> '
+    + '<span style="color:var(--gold)">'+l.productId+'</span> '
+    + 'R$'+(l.price||0).toFixed(2)+' '
+    + (l.note?'<span style="color:#888">('+l.note+')</span>':'')
+    + '<span style="float:right;color:var(--text3)">'+new Date(l.ts).toLocaleString('pt-BR')+'</span>'
+    + '</div>'
+  ).join('') : '<div style="color:var(--text3)">Sem compras registradas.</div>';
+}
+
 function exportDB() {
   window.open('/api/admin/export?token=' + encodeURIComponent(TOKEN), '_blank');
 }

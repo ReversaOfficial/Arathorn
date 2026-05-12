@@ -2839,57 +2839,116 @@ async function handleRequest(req, res) {
   }
 
   // ── POST /api/shop/webhook — Mercado Pago webhook ───────────────────────
-  // MP envia: { action: 'payment.updated', data: { id: '123456' } }
   if (method === 'POST' && url.startsWith('/api/shop/webhook')) {
     const body = await readBody(req);
-    console.log('[WEBHOOK] Recebido:', body.action || body.type || 'unknown', body.data?.id || '');
 
-    // MP: só processar payment.updated ou payment.created
+    // Log completo para debug
+    console.log('[WEBHOOK] ===== PAYLOAD COMPLETO =====');
+    console.log('[WEBHOOK]', JSON.stringify(body).slice(0, 500));
+    console.log('[WEBHOOK] ==============================');
+
+    // MP pode enviar varios formatos — aceitar todos
     const action = body.action || body.type || '';
-    if (action !== 'payment.updated' && action !== 'payment.created' && action !== 'payment') {
+    const isPayment =
+      action === 'payment.updated' ||
+      action === 'payment.created' ||
+      action === 'payment' ||
+      (body.topic === 'payment') ||
+      (body.data && body.data.id);
+
+    if (!isPayment) {
+      console.log('[WEBHOOK] Ignorando evento:', action);
       send(res, 200, { ok: true }); return;
     }
 
-    const paymentId = String((body.data && body.data.id) ? body.data.id : '');
+    // Extrair paymentId — MP pode mandar em lugares diferentes
+    const paymentId = String(
+      (body.data && body.data.id) ||
+      body.id ||
+      body.payment_id ||
+      ''
+    );
+
+    console.log('[WEBHOOK] paymentId extraido:', paymentId);
+
     if (!paymentId) {
+      console.warn('[WEBHOOK] Sem paymentId no payload');
       send(res, 200, { ok: true }); return;
     }
 
-    // Verificar status no Mercado Pago
     try {
+      // Verificar status diretamente na API do MP
       const mpCheck = await fetch('https://api.mercadopago.com/v1/payments/' + paymentId, {
         headers: { 'Authorization': 'Bearer ' + MP_ACCESS_TOKEN }
       });
       const mpData = await mpCheck.json();
-      console.log('[WEBHOOK] MP status:', mpData.status, 'id:', paymentId);
+
+      console.log('[WEBHOOK] Status MP:', mpData.status, '| external_ref:', mpData.external_reference);
 
       if (mpData.status !== 'approved') {
+        console.log('[WEBHOOK] Pagamento nao aprovado:', mpData.status);
         send(res, 200, { ok: true }); return;
       }
 
       const db = loadDB();
       if (!db.pendingOrders) db.pendingOrders = {};
 
-      // Encontrar pedido pelo paymentId ou external_reference
+      // Buscar pedido por paymentId OU external_reference
       let order = db.pendingOrders[paymentId];
       if (!order && mpData.external_reference) {
         order = Object.values(db.pendingOrders).find(o =>
-          o.externalRef === mpData.external_reference || o.paymentId === paymentId
+          o.externalRef === mpData.external_reference ||
+          o.paymentId === paymentId
         );
       }
 
+      console.log('[WEBHOOK] Pedido encontrado:', order ? 'SIM ('+order.productId+' para '+order.username+')' : 'NAO');
+      console.log('[WEBHOOK] Total pedidos pendentes:', Object.keys(db.pendingOrders).length);
+
       if (!order) {
-        console.warn('[WEBHOOK] Pedido nao encontrado para paymentId:', paymentId);
+        // FALLBACK: tentar extrair username/produto do external_reference
+        // Formato: "username_productId_timestamp"
+        if (mpData.external_reference) {
+          const parts = mpData.external_reference.split('_');
+          if (parts.length >= 2) {
+            const fbUsername = parts[0];
+            const fbProductId = parts[1];
+            const fbProduct = SHOP_CATALOG[fbProductId];
+            const fbUser = db.users[fbUsername];
+            if (fbProduct && fbUser && fbUser.gameState) {
+              console.log('[WEBHOOK] FALLBACK: aplicando por external_reference:', fbUsername, fbProductId);
+              applyShopRewards(fbUser.gameState, fbProduct.rewards);
+              if (!db.purchaseLog) db.purchaseLog = [];
+              db.purchaseLog.push({ username: fbUsername, productId: fbProductId,
+                price: fbProduct.price, paymentId, ts: Date.now(), source:'fallback' });
+              saveDB(db);
+              sendSSE(fbUsername, 'purchase_confirmed', {
+                productName: fbProduct.name,
+                rewards: {
+                  gold: fbProduct.rewards.gold||0, vipDays: fbProduct.rewards.vipDays||0,
+                  jailRelease: !!fbProduct.rewards.jailRelease,
+                  infirmaryRelease: !!fbProduct.rewards.infirmaryRelease,
+                  hpFull: !!fbProduct.rewards.hpFull,
+                }
+              });
+              console.log('[SHOP] ✅ Compra confirmada (fallback):', fbUsername, fbProduct.name);
+            } else {
+              console.warn('[WEBHOOK] Fallback falhou: produto ou user nao encontrado');
+            }
+          }
+        }
         send(res, 200, { ok: true }); return;
       }
+
       if (order.status === 'completed') {
-        send(res, 200, { ok: true }); return; // idempotente
+        console.log('[WEBHOOK] Pedido ja foi processado, ignorando.');
+        send(res, 200, { ok: true }); return;
       }
 
       const product = SHOP_CATALOG[order.productId];
       const user    = db.users[order.username];
       if (!product || !user || !user.gameState) {
-        console.warn('[WEBHOOK] Produto ou usuário não encontrado');
+        console.warn('[WEBHOOK] Produto ou usuário nao encontrado no DB');
         send(res, 200, { ok: true }); return;
       }
 
@@ -2898,13 +2957,8 @@ async function handleRequest(req, res) {
       order.completedAt = Date.now();
 
       if (!db.purchaseLog) db.purchaseLog = [];
-      db.purchaseLog.push({
-        username:  order.username,
-        productId: order.productId,
-        price:     order.price,
-        paymentId,
-        ts: Date.now()
-      });
+      db.purchaseLog.push({ username: order.username, productId: order.productId,
+        price: order.price, paymentId, ts: Date.now() });
 
       saveDB(db);
 
@@ -2921,9 +2975,9 @@ async function handleRequest(req, res) {
         }
       });
 
-      console.log('[SHOP] ✅ Compra confirmada via AbacatePay:', order.username, product.name, 'R$'+order.price);
+      console.log('[SHOP] ✅ Compra confirmada:', order.username, product.name, 'R$'+order.price);
     } catch(e) {
-      console.error('[SHOP] Webhook error:', e.message);
+      console.error('[SHOP] Webhook error:', e.message, e.stack);
     }
     send(res, 200, { ok: true });
     return;
@@ -3022,6 +3076,91 @@ async function handleRequest(req, res) {
   }
 
   // verifyAdminToken is defined at module level
+
+
+  // POST /api/admin/credit-payment — manually credit a payment (for missed webhooks)
+  if (method === 'POST' && url === '/api/admin/credit-payment') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Nao autorizado.'}); return; }
+    const { targetUsername, productId, note } = await readBody(req);
+    const db = loadDB();
+    const user = db.users[(targetUsername||'').toLowerCase()];
+    if (!user||!user.gameState) { send(res,404,{error:'Usuário nao encontrado.'}); return; }
+    const product = SHOP_CATALOG[productId];
+    if (!product) { send(res,404,{error:'Produto nao encontrado: '+productId}); return; }
+    applyShopRewards(user.gameState, product.rewards);
+    if (!db.purchaseLog) db.purchaseLog=[];
+    db.purchaseLog.push({ username:targetUsername, productId, price:product.price,
+      paymentId:'MANUAL_'+Date.now(), ts:Date.now(), note:note||'Admin manual credit' });
+    saveDB(db);
+    sendSSE((targetUsername||'').toLowerCase(), 'purchase_confirmed', {
+      productName: product.name,
+      rewards: {
+        gold: product.rewards.gold||0, vipDays: product.rewards.vipDays||0,
+        jailRelease: !!product.rewards.jailRelease,
+        infirmaryRelease: !!product.rewards.infirmaryRelease,
+        hpFull: !!product.rewards.hpFull,
+      }
+    });
+    console.log('[ADMIN] Manual credit:', targetUsername, productId);
+    send(res,200,{ok:true, applied:{ gold:product.rewards.gold||0, productName:product.name }}); return;
+  }
+
+  // GET /api/admin/purchase-log — view purchase history
+  if (method === 'GET' && url === '/api/admin/purchase-log') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Nao autorizado.'}); return; }
+    const db = loadDB();
+    const log = (db.purchaseLog||[]).slice(-100).reverse();
+    send(res,200,{log}); return;
+  }
+
+  // POST /api/admin/check-mp-payment — look up a payment on MP and apply if approved
+  if (method === 'POST' && url === '/api/admin/check-mp-payment') {
+    if (!verifyAdminToken(req)) { send(res,401,{error:'Nao autorizado.'}); return; }
+    const { paymentId, targetUsername, productId } = await readBody(req);
+    if (!paymentId) { send(res,400,{error:'paymentId necessario.'}); return; }
+    try {
+      const mpCheck = await fetch('https://api.mercadopago.com/v1/payments/'+paymentId, {
+        headers: { 'Authorization': 'Bearer ' + MP_ACCESS_TOKEN }
+      });
+      const mpData = await mpCheck.json();
+      if (mpData.status !== 'approved') {
+        send(res,400,{error:'Pagamento nao aprovado. Status: '+(mpData.status||'unknown')}); return;
+      }
+      // Try to find the order
+      const db = loadDB();
+      if (!db.pendingOrders) db.pendingOrders={};
+      let order = db.pendingOrders[paymentId];
+      if (!order && mpData.external_reference) {
+        order = Object.values(db.pendingOrders).find(o=>o.externalRef===mpData.external_reference);
+      }
+      // If still not found, use admin-provided info
+      if (!order && targetUsername && productId) {
+        order = { username:(targetUsername||'').toLowerCase(), productId, price:0,
+          paymentId, status:'pending', createdAt:Date.now() };
+      }
+      if (!order) { send(res,404,{error:'Pedido nao encontrado. Informe targetUsername e productId.'}); return; }
+      if (order.status==='completed') { send(res,200,{ok:true,msg:'Já processado anteriormente.'}); return; }
+      const product = SHOP_CATALOG[order.productId];
+      const user = db.users[order.username];
+      if (!product||!user||!user.gameState) { send(res,404,{error:'Produto ou usuário nao encontrado.'}); return; }
+      applyShopRewards(user.gameState, product.rewards);
+      if (order.paymentId) { order.status='completed'; order.completedAt=Date.now(); }
+      if (!db.purchaseLog) db.purchaseLog=[];
+      db.purchaseLog.push({ username:order.username, productId:order.productId,
+        price:product.price, paymentId, ts:Date.now(), note:'Admin recovery' });
+      saveDB(db);
+      sendSSE(order.username,'purchase_confirmed',{
+        productName:product.name,
+        rewards:{ gold:product.rewards.gold||0, vipDays:product.rewards.vipDays||0,
+          jailRelease:!!product.rewards.jailRelease, infirmaryRelease:!!product.rewards.infirmaryRelease,
+          hpFull:!!product.rewards.hpFull }
+      });
+      console.log('[ADMIN] Payment recovery:', order.username, product.name);
+      send(res,200,{ok:true, username:order.username, product:product.name, gold:product.rewards.gold||0}); return;
+    } catch(e) {
+      send(res,500,{error:'Erro: '+e.message}); return;
+    }
+  }
 
   // GET /api/admin/users — list all users with summary
   if (method === 'GET' && url === '/api/admin/users') {
