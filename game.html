@@ -4076,7 +4076,7 @@ function renderMissions(tab='solo') {
   const diffLabel = {easy:'Fácil',med:'Médio',hard:'Difícil',epic:'Épico'};
   panel.innerHTML = missions.map(m => {
     const cost = getStamCost(m);
-    const locked = G.level < m.minLv;
+    const locked = (m.type !== 'crime') && G.level < m.minLv;
     const noStam = G.stam < cost;
     const zeroStam = G.stam <= 0;
     const needsClan = m.type==='clan' && !G.clanName;
@@ -5010,7 +5010,7 @@ async function startMission(missionId) {
   const m = MISSIONS.find(x => x.id === missionId);
   if (!m) return;
   if (G.stam < m.stam) { toast('⚡ Estamina insuficiente! Vá à Taverna.','bad'); return; }
-  if (G.level < m.minLv) { toast('Nível '+m.minLv+' necessário!','bad'); return; }
+  if (m.type !== 'crime' && G.level < m.minLv) { toast('Nível '+m.minLv+' necessário!','bad'); return; }
   if (m.type === 'clan' && !G.clanName) { toast('Esta missão requer um clã!','bad'); return; }
   if (m.type === 'crime') {
     if (Date.now() < (G.jailUntil||0)) { toast('🔒 Você está preso! Pague a fiança ou aguarde.','bad'); return; }
