@@ -1007,7 +1007,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
       <div id="ko-overlay-timer" style="font-family:'Cinzel',serif;font-size:32px;font-weight:700;color:var(--red-light)">10:00</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn btn-gold" style="font-family:Cinzel,serif;letter-spacing:1px;padding:14px" onclick="reviveNow()">💰 Pagar 3.000 ouro — Sair agora</button>
+      <button class="btn btn-gold" style="font-family:Cinzel,serif;letter-spacing:1px;padding:14px" id="ko-revive-btn" onclick="reviveNow()">💰 Pagar ouro — Sair agora</button>
       <button class="btn btn-green" style="padding:14px" onclick="buyRevivePix()">⚡ PIX R$2,99 — Curar na hora</button>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Ou aguarde o timer acabar</div>
     </div>
@@ -1029,7 +1029,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg-deep);color:var
       <div id="jail-overlay-timer" style="font-family:'Cinzel',serif;font-size:36px;font-weight:700;color:var(--gold)">15:00</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn btn-gold" style="font-family:Cinzel,serif;letter-spacing:1px;padding:14px" onclick="payBail()">💰 Pagar 10.000 ouro — Sair agora</button>
+      <button class="btn btn-gold" style="font-family:Cinzel,serif;letter-spacing:1px;padding:14px" id="jail-bail-btn" onclick="payBail()">💰 Pagar ouro — Sair agora</button>
       <button class="btn btn-green" style="padding:14px" onclick="buyJailRelease()">⚡ PIX R$2,99 — Sair imediatamente</button>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Ou aguarde o timer para ser solto automaticamente</div>
     </div>
@@ -8946,6 +8946,34 @@ async function doRecover() {
 // JAIL SYSTEM
 // ══════════════════════════════════════════════════════════
 let _jailTimerInt = null;
+
+
+// Calculate bail/revive cost based on player level (mirrors server)
+function calcJailCost() {
+  const lv = G.level || 1;
+  if      (lv < 10)  return 8000;
+  else if (lv < 25)  return 30000;
+  else if (lv < 50)  return 120000;
+  else if (lv < 100) return 500000;
+  else if (lv < 200) return 2000000;
+  else if (lv < 350) return 8000000;
+  else if (lv < 500) return 25000000;
+  else               return 80000000;
+}
+function calcReviveCost() {
+  const lv = G.level || 1;
+  if      (lv < 10)  return 5000;
+  else if (lv < 25)  return 20000;
+  else if (lv < 50)  return 80000;
+  else if (lv < 100) return 300000;
+  else if (lv < 200) return 1000000;
+  else if (lv < 350) return 5000000;
+  else if (lv < 500) return 15000000;
+  else               return 50000000;
+}
+function fmtGoldCost(n) {
+  return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? Math.round(n/1e3)+'K' : String(n);
+}
 
 function updateJailBanner() {
   const banner   = document.getElementById('tav-jail-banner');

@@ -1966,15 +1966,34 @@ async function handleRequest(req, res) {
     if (!user||!user.gameState) { send(res,400,{error:'Personagem nao encontrado.'}); return; }
     const g = user.gameState;
     if (!g.knockedOutUntil || g.knockedOutUntil <= Date.now()) { send(res,400,{error:'Nao esta na enfermaria.'}); return; }
-    const REVIVE_COST = 3000;
-    if ((g.gold||0) < REVIVE_COST) { send(res,400,{error:'Precisa de 3.000 ouro para reviver agora.'}); return; }
+    // Custo escalado por nível — incentiva pagar R$2,99 em vez de ouro
+    const lv = g.level || 1;
+    let REVIVE_COST;
+    if      (lv < 10)  REVIVE_COST = 5000;
+    else if (lv < 25)  REVIVE_COST = 20000;
+    else if (lv < 50)  REVIVE_COST = 80000;
+    else if (lv < 100) REVIVE_COST = 300000;
+    else if (lv < 200) REVIVE_COST = 1000000;
+    else if (lv < 350) REVIVE_COST = 5000000;
+    else if (lv < 500) REVIVE_COST = 15000000;
+    else               REVIVE_COST = 50000000;
+
+    const costFmt = REVIVE_COST >= 1e6
+      ? (REVIVE_COST/1e6).toFixed(1)+'M'
+      : REVIVE_COST >= 1e3
+        ? Math.round(REVIVE_COST/1e3)+'K'
+        : String(REVIVE_COST);
+
+    if ((g.gold||0) < REVIVE_COST) {
+      send(res,400,{error:'Precisa de '+costFmt+' ouro para sair da enfermaria. (Lv'+lv+')'}); return;
+    }
     g.gold -= REVIVE_COST;
     g.knockedOutUntil = 0;
-    g.hp = Math.max(g.hpMax, g.effectiveHpMax || 0); // restore to full effective HP
+    g.hp = Math.max(g.hpMax, g.effectiveHpMax || 0);
     if (!g.log) g.log=[];
-    g.log.unshift({msg:'💊 Pagou 3.000 ouro para sair da enfermaria — HP restaurado!', cls:'info'});
+    g.log.unshift({msg:'💊 Pagou '+costFmt+' ouro para sair da enfermaria — HP restaurado!', cls:'info'});
     saveDB(db);
-    send(res,200,{ok:true, newBalance:g.gold, newHp:g.hp}); return;
+    send(res,200,{ok:true, newBalance:g.gold, newHp:g.hp, cost:REVIVE_COST}); return;
   }
 
 
@@ -3537,14 +3556,24 @@ async function handleRequest(req, res) {
     if (!user || !user.gameState) { send(res, 400, { error: 'Personagem nao encontrado.' }); return; }
     const g = user.gameState;
     if (!g.jailUntil || g.jailUntil <= Date.now()) { send(res, 400, { error: 'Voce nao esta preso.' }); return; }
-    const BAIL_COST = 10000;
-    if ((g.gold || 0) < BAIL_COST) { send(res, 400, { error: 'Precisa de 10.000 ouro para pagar a fianca.' }); return; }
+    const lvB = g.level || 1;
+    let BAIL_COST;
+    if      (lvB < 10)  BAIL_COST = 8000;
+    else if (lvB < 25)  BAIL_COST = 30000;
+    else if (lvB < 50)  BAIL_COST = 120000;
+    else if (lvB < 100) BAIL_COST = 500000;
+    else if (lvB < 200) BAIL_COST = 2000000;
+    else if (lvB < 350) BAIL_COST = 8000000;
+    else if (lvB < 500) BAIL_COST = 25000000;
+    else                BAIL_COST = 80000000;
+    const bailFmt = BAIL_COST>=1e6?(BAIL_COST/1e6).toFixed(1)+'M':BAIL_COST>=1e3?Math.round(BAIL_COST/1e3)+'K':String(BAIL_COST);
+    if ((g.gold||0) < BAIL_COST) { send(res,400,{error:'Precisa de '+bailFmt+' ouro de fiança. (Lv'+lvB+')'}); return; }
     g.gold -= BAIL_COST;
     g.jailUntil = 0;
-    if (!g.log) g.log = [];
-    g.log.unshift({ msg: '⚖️ Pagou 10.000 ouro de fiança e saiu da cadeia!', cls: 'info' });
+    if (!g.log) g.log=[];
+    g.log.unshift({msg:'⚖️ Pagou '+bailFmt+' ouro de fiança e saiu da cadeia!', cls:'info'});
     saveDB(db);
-    send(res, 200, { ok: true, newBalance: g.gold }); return;
+    send(res,200,{ok:true, newBalance:g.gold, cost:BAIL_COST}); return;
   }
 
 
