@@ -3499,38 +3499,44 @@ async function handleRequest(req, res) {
       send(res, 400, { error: 'Você está na enfermaria!' }); return;
     }
 
-    // Global crime counter — every 5th crime = caught
+    // Crime definitions server-side — individual catch chance per crime tier
+    const CRIME_DEFS = {
+      // Tier 1-4: 15 min preso | Tier 5-9: 30 min preso
+      53: { gold:[500,1500],            xp:[200,500],           catchChance:0.15, jailMin:15 },
+      54: { gold:[3000,8000],           xp:[1500,4000],         catchChance:0.25, jailMin:15 },
+      55: { gold:[15000,35000],         xp:[8000,20000],        catchChance:0.35, jailMin:15 },
+      56: { gold:[60000,130000],        xp:[40000,90000],       catchChance:0.45, jailMin:15 },
+      57: { gold:[300000,600000],       xp:[200000,450000],     catchChance:0.50, jailMin:30 },
+      58: { gold:[1500000,3000000],     xp:[1000000,2200000],   catchChance:0.60, jailMin:30 },
+      59: { gold:[8000000,15000000],    xp:[6000000,12000000],  catchChance:0.70, jailMin:30 },
+      60: { gold:[50000000,100000000],  xp:[40000000,80000000], catchChance:0.80, jailMin:30 },
+      61: { gold:[500000000,1000000000],xp:[400000000,800000000],catchChance:0.90,jailMin:30 },
+    };
+
+    const crimeDef = CRIME_DEFS[missionId] || CRIME_DEFS[53];
+
+    // Individual catch chance — higher reward = higher risk
+    const caught = Math.random() < crimeDef.catchChance;
+
+    // Global counter for stats
     if (!db.globalStats) db.globalStats = {};
     if (!db.globalStats.totalCrimes) db.globalStats.totalCrimes = 0;
     db.globalStats.totalCrimes++;
     const crimeNum = db.globalStats.totalCrimes;
-    const caughtByCounter = (crimeNum % 5 === 0);
 
-    if (caughtByCounter) {
-      // ARRESTED — 15 minutes jail
-      g.jailUntil = Date.now() + 15 * 60 * 1000;
+    if (caught) {
+      // ARRESTED — jail time scales with crime tier
+      const jailMs = crimeDef.jailMin * 60 * 1000;
+      g.jailUntil = Date.now() + jailMs;
       if (!g.log) g.log = [];
-      g.log.unshift({ msg: '🚔 PRESO! Crime #' + crimeNum + ' do servidor. 15min na cadeia. O crime não compensa!', cls: 'bad' });
+      g.log.unshift({ msg: '🚔 PRESO! Tentou ' + missionId + ' mas a guarda estava esperando. ' + crimeDef.jailMin + 'min na cadeia!', cls: 'bad' });
       saveDB(db);
-      send(res, 200, { ok: true, caught: true, crimeNum, jailUntil: g.jailUntil }); return;
+      send(res, 200, { ok: true, caught: true, crimeNum, jailUntil: g.jailUntil, jailMin: crimeDef.jailMin }); return;
     }
 
-    // Crime SUCCEEDS — calculate reward with 5% bonus
-    // Find the mission definition from a predefined list of crime rewards
-    const CRIME_REWARDS = {
-      53: { gold: [8,20],    xp: [6,14]    },
-      54: { gold: [40,80],   xp: [30,55]   },
-      55: { gold: [120,220], xp: [90,160]  },
-      56: { gold: [400,750], xp: [300,540] },
-      57: { gold: [2000,3500], xp: [1600,2800] },
-      58: { gold: [15000,26000], xp: [12000,19500] },
-      59: { gold: [200000,340000], xp: [160000,272000] },
-      60: { gold: [2000000,3400000], xp: [1600000,2720000] },
-    };
-    const reward = CRIME_REWARDS[missionId] || { gold: [10,30], xp: [8,20] };
-    const baseGold = Math.round(reward.gold[0] + Math.random() * (reward.gold[1] - reward.gold[0]));
-    const baseXp   = Math.round(reward.xp[0]   + Math.random() * (reward.xp[1]   - reward.xp[0]));
-    // +5% crime bonus
+    // SUCCESS — calculate reward with 5% bonus
+    const baseGold = Math.round(crimeDef.gold[0] + Math.random() * (crimeDef.gold[1] - crimeDef.gold[0]));
+    const baseXp   = Math.round(crimeDef.xp[0]   + Math.random() * (crimeDef.xp[1]   - crimeDef.xp[0]));
     const gold = Math.round(baseGold * 1.05);
     const xp   = Math.round(baseXp   * 1.05);
 
@@ -3539,10 +3545,9 @@ async function handleRequest(req, res) {
     g.stats = g.stats || {};
     g.stats.crimes   = (g.stats.crimes   || 0) + 1;
     g.stats.missions = (g.stats.missions || 0) + 1;
-    // Server-side level up
     applyServerLevelUps(g);
     if (!g.log) g.log = [];
-    g.log.unshift({ msg: '🎭 Crime bem-sucedido! +' + gold + ' ouro +' + xp + ' XP (bônus 5%)', cls: 'good' });
+    g.log.unshift({ msg: '🎭 Crime bem-sucedido! +' + gold.toLocaleString() + ' ouro +' + xp.toLocaleString() + ' XP (+5%)', cls: 'good' });
     saveDB(db);
     send(res, 200, { ok: true, caught: false, crimeNum, gold, xp, newLevel: g.level }); return;
   }

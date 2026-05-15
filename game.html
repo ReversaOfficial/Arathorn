@@ -2467,14 +2467,64 @@ const MISSIONS = [
    enemies:['O Sem-Nome','Fragmento da Extinção','A Vontade do Caos']},
 
   // ── CRIMES ─────────────────────────────────────────────────────────────────
-  {id:53,type:'crime',icon:'🎭',name:'Roubar da Mercearia do Porto',      stam:1,minLv:1,  gold:[8,20],     xp:[6,14],     win:0.80,diff:'easy',jail:true,jailTime:30},
-  {id:54,type:'crime',icon:'⚗️', name:'Contrabando de Poções Proibidas',  stam:1,minLv:5,  gold:[40,80],    xp:[30,55],    win:0.72,diff:'med', jail:true,jailTime:90},
-  {id:55,type:'crime',icon:'💰',name:'Assalto à Caravana Real',           stam:2,minLv:15, gold:[120,220],  xp:[90,160],   win:0.62,diff:'hard',jail:true,jailTime:180},
-  {id:56,type:'crime',icon:'👑',name:'Furto no Tesouro do Rei',           stam:3,minLv:30, gold:[400,750],  xp:[300,540],  win:0.48,diff:'epic',jail:true,jailTime:360},
-  {id:57,type:'crime',icon:'🗝️',name:'Roubo dos Segredos da Guilda',      stam:3,minLv:80, gold:[2000,3500],xp:[1600,2800],win:0.42,diff:'epic',jail:true,jailTime:600},
-  {id:58,type:'crime',icon:'🏦',name:'Assalto ao Banco Imperial',         stam:4,minLv:200,gold:[15000,26000],xp:[12000,19500],win:0.35,diff:'epic',jail:true,jailTime:1200},
-  {id:59,type:'crime',icon:'🌌',name:'Roubo dos Pergaminhos Cósmicos',    stam:5,minLv:500,gold:[200000,340000],xp:[160000,272000],win:0.28,diff:'epic',jail:true,jailTime:3600},
-  {id:60,type:'crime',icon:'🕳️',name:'O Grande Roubo do Vazio',           stam:6,minLv:800,gold:[2000000,3400000],xp:[1600000,2720000],win:0.22,diff:'epic',jail:true,jailTime:7200},
+  // ══════════════════════════════════════════════════════════════════
+  // CRIMES — Sem nível mínimo. Risco cresce com a recompensa.
+  // Tier 1-4: 15min preso se pego | Tier 5-9: 30min
+  // ══════════════════════════════════════════════════════════════════
+
+  {id:53,type:'crime',zone:null,icon:'🎭',
+   name:'Bater Carteira no Mercado',
+   desc:'Alvos distraídos, guarda sonolenta. Risco baixo.',
+   stam:1,minLv:1,gold:[500,1500],xp:[200,500],
+   catchChance:0.15,diff:'easy',jail:true,jailTime:900},
+
+  {id:54,type:'crime',zone:null,icon:'🍺',
+   name:'Roubar o Cofre da Taverna',
+   desc:'O taberneiro guarda o ouro no fundo. Mas ele é esperto.',
+   stam:1,minLv:1,gold:[3000,8000],xp:[1500,4000],
+   catchChance:0.25,diff:'easy',jail:true,jailTime:900},
+
+  {id:55,type:'crime',zone:null,icon:'⚗️',
+   name:'Contrabando de Poções Proibidas',
+   desc:'A guarda fareja poções desde longe. Vale o risco?',
+   stam:2,minLv:1,gold:[15000,35000],xp:[8000,20000],
+   catchChance:0.35,diff:'med',jail:true,jailTime:900},
+
+  {id:56,type:'crime',zone:null,icon:'💰',
+   name:'Assalto à Caravana Real',
+   desc:'Escolta armada. Muito ouro. Muita guarda.',
+   stam:2,minLv:1,gold:[60000,130000],xp:[40000,90000],
+   catchChance:0.45,diff:'med',jail:true,jailTime:900},
+
+  {id:57,type:'crime',zone:null,icon:'👑',
+   name:'Furto no Tesouro do Rei',
+   desc:'Câmaras secretas, armadilhas e guardas reais. Fortuna enorme.',
+   stam:3,minLv:1,gold:[300000,600000],xp:[200000,450000],
+   catchChance:0.50,diff:'hard',jail:true,jailTime:1800},
+
+  {id:58,type:'crime',zone:null,icon:'🗝️',
+   name:'Roubo dos Segredos da Guilda',
+   desc:'Magia de detecção. Guardiões invisíveis. Recompensa absurda.',
+   stam:3,minLv:1,gold:[1500000,3000000],xp:[1000000,2200000],
+   catchChance:0.60,diff:'hard',jail:true,jailTime:1800},
+
+  {id:59,type:'crime',zone:null,icon:'🏦',
+   name:'Assalto ao Banco Imperial',
+   desc:'Cofre encantado, 20 guardas. Só os mais ousados tentam.',
+   stam:4,minLv:1,gold:[8000000,15000000],xp:[6000000,12000000],
+   catchChance:0.70,diff:'epic',jail:true,jailTime:1800},
+
+  {id:60,type:'crime',zone:null,icon:'🌌',
+   name:'Roubo dos Pergaminhos Cósmicos',
+   desc:'Vigilância mágica suprema. 80% de chance de ser preso.',
+   stam:5,minLv:1,gold:[50000000,100000000],xp:[40000000,80000000],
+   catchChance:0.80,diff:'epic',jail:true,jailTime:1800},
+
+  {id:61,type:'crime',zone:null,icon:'🕳️',
+   name:'O Grande Roubo do Vazio',
+   desc:'Roubar do próprio Vazio. 90% de prisão. Mas a recompensa é lendária.',
+   stam:6,minLv:1,gold:[500000000,1000000000],xp:[400000000,800000000],
+   catchChance:0.90,diff:'epic',jail:true,jailTime:1800},
 ];
 // ITEM GRADES: normal | excellent | superrare | epic | supreme
 // classBonus: race that gets +5% all stats when wearing this item
@@ -4031,6 +4081,9 @@ function renderMissions(tab='solo') {
     const zeroStam = G.stam <= 0;
     const needsClan = m.type==='clan' && !G.clanName;
     const inJail = m.type==='crime' && Date.now() < (G.jailUntil||0);
+    // Add catch chance display for crimes
+    const catchPct = m.catchChance ? Math.round(m.catchChance*100) : null;
+    const catchColor = !catchPct ? '' : catchPct < 20 ? 'var(--green-light)' : catchPct < 40 ? '#d0a040' : catchPct < 60 ? '#ff7b00' : 'var(--red-light)';
     const ko = isKnockedOut();
     const disabled = locked||needsClan||inJail||ko;
     let warning = '';
@@ -4049,9 +4102,17 @@ function renderMissions(tab='solo') {
             <span style="${stamColor}">⚡ ${cost} estamina${zeroStam?' ⚠️':''}</span>
             <span class="${diffCls[m.diff]}">${diffLabel[m.diff]}</span>
             ${m.clanSize?`<span style="color:var(--gold)">👥 ${m.clanSize} jogadores</span>`:''}
-            ${m.jail?`<span style="color:var(--red-light)">⚠ Risco prisão</span>`:''}
+            ${m.catchChance
+              ? `<span style="color:${
+                  m.catchChance<0.20?'var(--green-light)':
+                  m.catchChance<0.40?'#d0a040':
+                  m.catchChance<0.60?'#ff7b00':
+                  'var(--red-light)'
+                }">🚔 ${Math.round(m.catchChance*100)}% risco</span>`
+              : m.jail?`<span style="color:var(--red-light)">⚠ Risco prisão</span>`:''
+            }
           </div>
-          <div class="mission-reward">🏆 +${m.gold[0]}–${m.gold[1]} 🪙 | +${m.xp[0]}–${m.xp[1]} XP</div>
+          <div class="mission-reward">🏆 +${fmtN(m.gold[0])}–${fmtN(m.gold[1])} ⬡ | +${fmtN(m.xp[0])}–${fmtN(m.xp[1])} XP</div>
         </div>
         ${warning?`<div>${warning}</div>`:''}
       </div>
@@ -4971,20 +5032,22 @@ async function startMission(missionId) {
 
     if (crimeRes.caught) {
       // ARRESTED — 15 min, message: "O crime não compensa"
-      G.jailUntil = crimeRes.jailUntil || (Date.now() + 15 * 60 * 1000);
-      addLog('🚔 PRESO! Crime #' + crimeRes.crimeNum + '. 15min na cadeia.', 'bad');
+      const jailMins = crimeRes.jailMin || 15;
+      G.jailUntil = crimeRes.jailUntil || (Date.now() + jailMins * 60 * 1000);
+      addLog('🚔 PRESO! ' + jailMins + 'min na cadeia. O crime não compensa!', 'bad');
       updateUI();
       updateJailBanner(); // shows overlay immediately
       // Reload state from server
       api('GET', '/api/load').then(lr => { if (lr.gameState) { G = lr.gameState; updateUI(); updateJailBanner(); } });
+      const bailCost = fmtGoldCost(calcJailCost());
       showModal(
         '🚔 Preso em Flagrante!',
         '<div style="text-align:center">'
         + '<div style="font-size:48px;margin-bottom:8px">🚔</div>'
         + '<div style="font-family:Cinzel,serif;font-size:18px;color:var(--red-light);font-weight:700;margin-bottom:10px">O crime não compensa!</div>'
-        + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">Você foi o <b>' + crimeRes.crimeNum + 'º crime</b> cometido no servidor.<br>A guarda estava monitorando as atividades.</div>'
+        + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">A guarda estava esperando. Crime de alto risco, alta penalidade.</div>'
         + '<div style="padding:12px;background:rgba(192,40,40,.1);border-radius:var(--radius);font-size:12px;color:var(--red-light)">'
-        + '🔒 Cadeia por <b>15 minutos</b><br><small>Pague 10.000 ouro de fiança ou R$2,99 via PIX para sair antes</small>'
+        + '🔒 Cadeia por <b>' + jailMins + ' minutos</b><br><small>Pague ⬡ ' + bailCost + ' de fiança ou R$2,99 via PIX para sair antes</small>'
         + '</div></div>',
         [
           { label: '💰 Pagar 10.000 ouro', fn: async () => { closeModal(); await payBail(); }},
@@ -8971,6 +9034,7 @@ function calcReviveCost() {
   else if (lv < 500) return 15000000;
   else               return 50000000;
 }
+function fmtN(n){return n>=1e9?(n/1e9).toFixed(1)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?Math.round(n/1e3)+'K':String(n);}
 function fmtGoldCost(n) {
   return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? Math.round(n/1e3)+'K' : String(n);
 }
